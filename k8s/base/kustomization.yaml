@@ -1,0 +1,24 @@
+kind: Kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+commonLabels:
+  app: gke-stockprice
+
+resources:
+- cronjob.yaml
+- configMap.yaml
+
+generatorOptions:
+  disableNameSuffixhash: true
+secretGenerator:
+# - name: kube-user
+#   files:
+#   - username=username.txt
+# - name: kube-pass
+#   files:
+#   - password=password.txt
+# - name: kube-tradederby-sheetid
+#   files:
+#   - tradederby_sheetid=tradederby_sheetid.txt
+- name: kube-gke-stockprice-serviceaccount
+  files:
+  - gke-stockprice-serviceaccount.json

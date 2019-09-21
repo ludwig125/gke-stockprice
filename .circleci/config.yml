@@ -1,0 +1,210 @@
+version: 2
+jobs:
+  build:
+    environment:
+      PROJECT_NAME: gke-stockprice
+      IMAGE_NAME: gke-stockprice
+    docker:
+      - image: google/cloud-sdk
+    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 18.06.0-ce
+      - run:
+          name: Setup CLOUD SDK
+          command: |
+            # base64 -i ignore non-alphabet characters
+            echo $GCLOUD_SERVICE_KEY | base64 -di > ${HOME}/gcloud-service-key.json
+            gcloud auth activate-service-account --key-file ${HOME}/gcloud-service-key.json
+            gcloud --quiet auth configure-docker
+      - run:
+          name: Docker Build & Push
+          command: |
+            docker build -t us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:${CIRCLE_BUILD_NUM} .
+            docker tag us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:${CIRCLE_BUILD_NUM} us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:latest
+            if [ -n "${CIRCLE_TAG}" ]; then
+              docker tag us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:${CIRCLE_BUILD_NUM} us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:${CIRCLE_TAG}
+            fi
+            docker push us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}
+  deploy:
+    environment:
+      PROJECT_NAME: gke-stockprice
+      CLUSTER_NAME: gke-stockprice-small-cluster
+      COMPUTE_ZONE: us-west1-c
+    docker:
+      - image: google/cloud-sdk
+    working_directory: /app
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 18.06.0-ce
+      - run:
+          name: Setup CLOUD SDK
+          command: |
+            # base64 -i ignore non-alphabet characters
+            echo $GCLOUD_SERVICE_KEY | base64 -di > ${HOME}/gcloud-service-key.json
+            gcloud auth activate-service-account --key-file ${HOME}/gcloud-service-key.json
+      - run:
+          name: Setup GKE Cluster Infomation
+          command: |
+            gcloud config set project $PROJECT_NAME
+            gcloud config set container/cluster $CLUSTER_NAME
+            gcloud config set compute/zone ${COMPUTE_ZONE}
+            gcloud container clusters get-credentials $CLUSTER_NAME
+      - run:
+          name: Create secret
+          command: |
+            echo -n ${SLACK_TOKEN} > ./k8s/slack_token.txt
+            echo -n ${SLACK_CHANNEL} > ./k8s/slack_channel.txt
+            echo -n ${CIRCLE_API_USER_TOKEN} > ./k8s/circleci_token.txt
+      - run:
+          name: Install kustomize
+          # ref. https://github.com/kubernetes-sigs/kustomize/blob/master/docs/INSTALL.md#quickly-curl-the-latest-binary
+          command: |
+            opsys=linux
+            curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases |\
+                grep browser_download |\
+                grep $opsys |\
+                cut -d '"' -f 4 |\
+                grep /kustomize/v |\
+                sort | tail -n 1 |\
+                xargs curl -O -L
+            tar xzf ./kustomize_v*_${opsys}_amd64.tar.gz
+            ./kustomize version
+            # mv kustomize_*_${opsys}_amd64 kustomize
+            # chmod u+x kustomize
+      - deploy:
+          name: Kustomize build and Apply
+          command: |
+            ./kustomize build ./k8s/ | /usr/bin/kubectl apply -f -
+  list_gke_cluster:
+    working_directory: /app
+    environment:
+      PROJECT_NAME: gke-stockprice
+    docker:
+      - image: google/cloud-sdk:alpine
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Set gcloud
+          command: |
+              # cloud-sdk:alpineの場合はbase64 -iがない
+              echo $GCLOUD_SERVICE_KEY | base64 -d > ${HOME}/service_account.json
+              gcloud auth activate-service-account --key-file ${HOME}/service_account.json
+              gcloud config set project $PROJECT_NAME
+      - run:
+          name: List GKE Cluster
+          command: gcloud container clusters list
+  delete_gke_cluster:
+    working_directory: /app
+    environment:
+      PROJECT_NAME: gke-stockprice
+      CLUSTER_NAME: gke-stockprice-small-cluster
+      COMPUTE_ZONE: us-west1-c
+    docker:
+      - image: google/cloud-sdk # kubectlを使うのでalpineではない
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Set gcloud
+          command: |
+              echo $GCLOUD_SERVICE_KEY | base64 -di > ${HOME}/service_account.json
+              gcloud auth activate-service-account --key-file ${HOME}/service_account.json
+              gcloud config set project $PROJECT_NAME
+              gcloud config set container/cluster $CLUSTER_NAME
+              gcloud config set compute/zone ${COMPUTE_ZONE} # delete時にもzone or regionの指定が必要
+              gcloud container clusters get-credentials $CLUSTER_NAME # kubectlを使うので必要
+      - run:
+          name: Delete GKE Cluster
+          command: |
+              # clusterが存在する場合のみdelete
+              if [ `gcloud container clusters list | grep $CLUSTER_NAME | wc -l` == 1 ]; then
+                # clusterが存在してもStop中のこともあるのでRUNNINGのときだけdelete
+                if [ `gcloud container clusters describe $CLUSTER_NAME | grep 'RUNNING' | wc -l` -gt 0 ]; then
+                  # deleteには時間がかかるので先にcronjobを消す
+                  kubectl delete cronjob gke-stockprice
+                  # --quiet をつけないと削除するかどうかy/nの入力を求める表示が出る
+                  gcloud --quiet container clusters delete $CLUSTER_NAME
+                fi
+              else
+                echo "$CLUSTER_NAME cluster does not exist"
+              fi
+      - run:
+          name: Check GKE Cluster
+          command: gcloud container clusters list
+  create_gke_cluster:
+    working_directory: /app
+    environment:
+      PROJECT_NAME: gke-stockprice
+      CLUSTER_NAME: gke-stockprice-small-cluster
+      COMPUTE_ZONE: us-west1-c
+      #MACHINE_TYPE: n1-standard-4
+      MACHINE_TYPE: g1-small
+    docker:
+      - image: google/cloud-sdk:alpine
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Set gcloud
+          command: |
+              # cloud-sdk:alpineの場合はbase64 -iがない
+              echo $GCLOUD_SERVICE_KEY | base64 -d > ${HOME}/service_account.json
+              gcloud auth activate-service-account --key-file ${HOME}/service_account.json
+              gcloud config set project $PROJECT_NAME
+              gcloud config set compute/zone ${COMPUTE_ZONE}
+      - run:
+          name: Create GKE Cluster
+          no_output_timeout: 20m # これを防ぐ：Too long with no output (exceeded 10m0s)
+          command: |
+              if [ `gcloud container clusters list | grep $CLUSTER_NAME | wc -l` == 1 ]; then
+                # clusterが存在する場合、ERRORになっていないか確認
+                if [ `gcloud container clusters describe $CLUSTER_NAME | grep 'ERROR' | wc -l` != 0 ]; then
+                  # うまく作れていないときは消してからもう一度作る
+                  gcloud --quiet container clusters delete $CLUSTER_NAME
+                  gcloud --quiet container clusters create $CLUSTER_NAME \
+                  --machine-type=$MACHINE_TYPE --disk-size 10 --zone $COMPUTE_ZONE \
+                  --num-nodes=2
+                fi
+              elif [ `gcloud container clusters list | grep $CLUSTER_NAME | wc -l` == 0 ]; then
+                # clusterが存在しない場合はcreate
+                # --quiet をつけないと作成するかどうかy/nの入力を求める表示が出る
+                gcloud --quiet container clusters create $CLUSTER_NAME \
+                --machine-type=$MACHINE_TYPE --disk-size 10 --zone $COMPUTE_ZONE \
+                --num-nodes=2
+              else
+                echo "$CLUSTER_NAME cluster already exists"
+              fi
+      - run:
+          name: Check GKE Cluster
+          command: gcloud container clusters list
+
+workflows:
+  version: 2
+  master-build:
+    jobs:
+      - build:
+          filters:
+            branches:
+              only: master
+      # buildのあとにdeployを実行したい場合は以下を有効にする
+      # - deploy:
+      #     requires:
+      #       - build
+  # cronで定期実行させたい場合は以下を有効にする
+  # create-deploy:
+  #   triggers:
+  #     - schedule:
+  #         cron: "10 0-6 * * *" # 9-15 in JST
+  #         filters:
+  #           branches:
+  #             only:
+  #               - master
+  #   jobs:
+  #     - create_gke_cluster
+  #     - deploy:
+  #         requires:
+  #           - create_gke_cluster
