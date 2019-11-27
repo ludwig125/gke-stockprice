@@ -72,8 +72,6 @@ jobs:
                 xargs curl -O -L
             tar xzf ./kustomize_v*_${opsys}_amd64.tar.gz
             ./kustomize version
-            # mv kustomize_*_${opsys}_amd64 kustomize
-            # chmod u+x kustomize
       - deploy:
           name: Kustomize build and Apply
           command: |
@@ -188,12 +186,12 @@ workflows:
     jobs:
       - build:
           filters:
-            branches:
-              only: master
-      # buildのあとにdeployを実行したい場合は以下を有効にする
-      # - deploy:
-      #     requires:
-      #       - build
+            # branches:
+            #   only: master
+      buildのあとにdeployを実行したい場合は以下を有効にする
+      - deploy:
+          requires:
+            - build
   # cronで定期実行させたい場合は以下を有効にする
   # create-deploy:
   #   triggers:

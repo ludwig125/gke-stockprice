@@ -21,6 +21,32 @@ spec:
             app: gke-stockprice
         spec:
           containers:
+          # [START proxy_container]
+          - name: cloudsql-proxy
+            image: us.gcr.io/cloudsql-docker/gce-proxy:1.16
+            command: ["/cloud_sql_proxy",
+                      #"-instances=gke-stockprice:us-central1:gke-stockprice-us-central1-db-f1-micro-201911170406=tcp:3306",
+                      "-instances=$(DB_INSTANCE)=tcp:3306",
+                      #"-instances=gke-stockprice:us-central1:gke-stockprice-us-central1-db-f1-micro-201911170406=tcp:0.0.0.0:3306",
+                      "-credential_file=/credential/gke-stockprice-serviceaccount.json"]
+            ports:
+              - containerPort: 3306
+            # [START cloudsql_security_context]
+            securityContext:
+              runAsUser: 2  # non-root user
+              allowPrivilegeEscalation: false
+            # [END cloudsql_security_context]
+            env:
+            - name: DB_INSTANCE
+              valueFrom:
+                configMapKeyRef:
+                  name: sql-proxy-config
+                  key: db_instance
+            volumeMounts:
+              - name: serviceaccount-volume
+                mountPath: credential
+                readOnly: true
+          # [END proxy_container]
           - name: gke-stockprice-container
             image: us.gcr.io/gke-stockprice/gke-stockprice:latest
             imagePullPolicy: Always
@@ -30,27 +56,27 @@ spec:
             resources:
               requests:
                 memory: 512Mi
-            # env:
-            # - name: ENV_NUMBER
-            #   valueFrom:
-            #     configMapKeyRef:
-            #       name: the-map
-            #       key: env_number
-            # - name: APPUSER
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: kube-user
-            #       key: username
-            # - name: APPPASS
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: kube-pass
-            #       key: password
-            # - name: TRADEDERBY_SHEETID
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: kube-tradederby-sheetid
-            #       key: tradederby_sheetid
+            env:
+            - name: ENV_NUMBER
+              valueFrom:
+                configMapKeyRef:
+                  name: the-map
+                  key: env_number
+            - name: DB_INSTANCE
+              valueFrom:
+                configMapKeyRef:
+                  name: sql-proxy-config
+                  key: db_instance
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-config
+                  key: db_username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-config
+                  key: db_password
             volumeMounts:
               - name: serviceaccount-volume
                 mountPath: credential
@@ -63,4 +89,3 @@ spec:
               - key: gke-stockprice-serviceaccount.json # keyはファイル名がそのまま設定されている
                 path: gke-stockprice-serviceaccount.json
           restartPolicy: Never # Cron失敗時にコンテナを再起動しない
-          # restartPolicy: OnFailure

@@ -117,22 +117,8 @@ func TestScrapeDailyStockPricesEmpty(t *testing.T) {
 }
 
 func TestFormatDate(t *testing.T) {
-	// tmpYear := thisYear
-	// tmpMonth := thisMonth
-	// defer func() {
-	// 	thisYear = tmpYear
-	// 	thisMonth = tmpMonth
-	// }()
-
-	// thisYear = 2019
-	// thisMonth = 2
-	tmpNow := now
-	defer func() {
-		now = tmpNow
-	}()
-
 	// テスト起動時刻を 2019/2/1と設定
-	now = time.Date(2019, 2, 1, 0, 0, 0, 0, time.Local)
+	now := time.Date(2019, 2, 1, 0, 0, 0, 0, time.Local)
 
 	cases := []struct {
 		name    string
@@ -152,7 +138,7 @@ func TestFormatDate(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := formatDate(tt.in)
+			got, err := formatDate(now, tt.in)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("got error %v, wantErr %t", err, tt.wantErr)
 			}

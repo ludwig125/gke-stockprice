@@ -31,8 +31,10 @@ func scrapeDailyStockPrices(ctx context.Context, code string, dailyStockpriceURL
 		re := regexp.MustCompile(`[0-9]+/[0-9]+`).Copy()
 		// 日付を取得
 		date = re.FindString(date)
-		// スクレイピングで取得した日付に年をつけたりゼロ埋めする
-		date, err := formatDate(date)
+
+		now := time.Now().In(jst)
+		// 現在時刻を参考にスクレイピングで取得した日付に年をつけたりゼロ埋めする
+		date, err := formatDate(now, date)
 		if err != nil {
 			docerr = fmt.Errorf("failed to formatDate: %w", err)
 			return
@@ -108,7 +110,7 @@ func fetchWebpageDoc(ctx context.Context, code string, dailyStockpriceURL string
 // 日付に年を追加する関数。現在の日付を元に前の年のものかどうか判断する
 // 1/4 のような日付をゼロ埋めして01/04にする
 // 例えば8/12 のような形で来たdateは 2018/08/12 にして返す
-func formatDate(date string) (string, error) {
+func formatDate(now time.Time, date string) (string, error) {
 	// スクレイピングしたデータを月と日に分ける
 	monthdate := strings.Split(date, "/")
 	if len(monthdate) != 2 {

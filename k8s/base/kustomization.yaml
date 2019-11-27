@@ -9,10 +9,16 @@ resources:
 
 generatorOptions:
   disableNameSuffixhash: true
+
+configMapGenerator:
+- name: sql-proxy-config
+  literals:
+  - db_instance=override.me
+
 secretGenerator:
-# - name: kube-user
+# - name: db-config
 #   files:
-#   - username=username.txt
+#   - db_username=db_username.txt
 # - name: kube-pass
 #   files:
 #   - password=password.txt
