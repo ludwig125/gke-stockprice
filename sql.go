@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"log"
 
 	"github.com/pkg/errors"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // DB is interface of database
@@ -25,7 +28,7 @@ type MySQL struct {
 /*
 dataSourceName:
 	cloud sql
-		<user>:<pass>@cloudsql(<connection>)/<databaseName>
+		<user>:<pass>@tcp(<dbinstance>)/<databaseName>
 	local mysql
 		root@/stockprice_dev
 */
@@ -42,7 +45,13 @@ func NewDB(dataSourceName string) (DB, error) {
 	if err = sqldb.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to Ping: %w", err) // proper error handling instead of panic in your app
 	}
-	return &MySQL{sqldb}, nil
+
+	db := &MySQL{sqldb}
+	// DBに接続されているか確認
+	if err := ensureDB(db); err != nil {
+		return nil, fmt.Errorf("failed to ensureDB: %v", err)
+	}
+	return db, nil
 }
 
 func openSQL(dataSourceName string) (*sql.DB, error) {
@@ -51,6 +60,20 @@ func openSQL(dataSourceName string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to open DB: %w", err)
 	}
 	return db, nil
+}
+
+func ensureDB(db DB) error {
+	// ensure using database
+	res, err := db.SelectDB("select database()")
+	if err != nil {
+		return fmt.Errorf("failed to select database(): %v", err)
+	}
+	// database が指定されていなかったらNULLが返る
+	if res[0][0] == "" {
+		return fmt.Errorf("database needs to be used. 'select database()': '%v'", res)
+	}
+	log.Printf("use database %s", res[0][0])
+	return nil
 }
 
 // ShowDatabases show all databases in mysql

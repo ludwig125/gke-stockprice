@@ -7,3 +7,16 @@ resources:
 - ../../base
 patchesStrategicMerge:
 - map.yaml
+
+configMapGenerator:
+- name: sql-proxy-config
+  behavior: replace
+  literals:
+  - db_instance=gke-stockprice:us-central1:gke-stockprice-us-central1-db-f1-micro-201911170406
+
+secretGenerator:
+- name: db-config
+  behavior: create
+  files:
+  - db_username=db_username.txt
+  - db_password=db_password.txt

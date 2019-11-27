@@ -11,63 +11,59 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	//_ "github.com/go-sql-driver/mysql"
 )
 
 var (
-	now = getNow() // 現在時刻を全体で使う
+	jst = getLocation() // タイムゾーンを全体で使う
 	env = useEnvOrDefault("ENV", "dev")
 )
 
-func getNow() time.Time {
+func getLocation() *time.Location {
 	jst, err := time.LoadLocation("Asia/Tokyo")
 	if err != nil {
 		log.Fatalf("failed to get LoadLocation: %v", err)
 	}
-	return time.Now().In(jst)
+	return jst
 }
 
 func main() {
 	log.Println("start")
-	// if os.Getenv("ENABLE_GKE_CLUSTER_DELETE") == "on" {
-	// 	ciToken := mustGetenv("CIRCLE_API_USER_TOKEN")
-	// 	defer func() {
-	// 		err := requestCircleci(ciToken, "delete_gke_cluster")
-	// 		if err != nil {
-	// 			log.Printf("failed to requestCircleci: %v", err)
-	// 		}
-	// 		log.Println("requestCircleci successfully", ciToken)
-	// 	}()
-	// }
+	if os.Getenv("ENABLE_GKE_CLUSTER_DELETE") == "on" {
+		ciToken := mustGetenv("CIRCLE_API_USER_TOKEN")
+		defer func() {
+			err := requestCircleci(ciToken, "delete_gke_cluster")
+			if err != nil {
+				log.Printf("failed to requestCircleci: %v", err)
+			}
+			log.Println("requestCircleci successfully", ciToken)
+		}()
+	}
 
-	//	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	sigCh := make(chan os.Signal, 1)
 	//ref. https://golang.org/pkg/os/signal/#example_Notify_allSignals
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	defer func() {
 		signal.Stop(sigCh) // シグナルの受付を終了する
-		//		cancel() // あとで上のctxと一緒に有効にする
+		cancel()           // あとで上のctxと一緒に有効にする
 	}()
 
 	go func() {
 		select {
 		case sig := <-sigCh: // シグナルを受け取ったらここに入る
 			fmt.Println("Got signal!", sig)
-			//	cancel() // cancelを呼び出して全ての処理を終了させる
+			cancel() // cancelを呼び出して全ての処理を終了させる
+			return
 		}
 	}()
 
-	for i := 0; i <= 10000; i++ {
-		log.Printf("i=%d", i)
-		time.Sleep(1 * time.Second)
+	// 日時バッチ処理
+	if err := daily(ctx); err != nil {
+		log.Println(err)
+		cancel() // 何らかのエラーが発生した場合、他の処理も全てcancelさせる
+		return
 	}
-	log.Println("finish")
-
-	// // 日時バッチ処理
-	// if err := daily(ctx); err != nil {
-	// 	log.Println(err)
-	// 	cancel() // 何らかのエラーが発生した場合、他の処理も全てcancelさせる
-	// 	return
-	// }
 }
 
 func daily(ctx context.Context) error {
@@ -77,10 +73,10 @@ func daily(ctx context.Context) error {
 	if env == "prod" {
 		// prod環境ならPASSWORD必須
 		log.Println("this is prod. trying to fetch CLOUDSQL_PASSWORD")
-		db, dberr = NewDB(fmt.Sprintf("%s:%s@cloudsql(%s)/%s",
-			mustGetenv("CLOUDSQL_USER"),
-			mustGetenv("CLOUDSQL_PASSWORD"),
-			mustGetenv("CLOUDSQL_CONNECTION_NAME"),
+		db, dberr = NewDB(fmt.Sprintf("%s/%s",
+			getDSN(mustGetenv("DB_USER"),
+				mustGetenv("DB_PASSWORD"),
+				"127.0.0.1:3306"),
 			"stockprice"))
 	} else {
 		log.Println("this is dev")
@@ -90,11 +86,6 @@ func daily(ctx context.Context) error {
 		return fmt.Errorf("failed to NewDB: %v", dberr)
 	}
 	defer db.CloseDB()
-	// DBに接続されているか確認
-	// この部分NewDB内に持っていくかあとで考える
-	if err := ensureDB(db); err != nil {
-		return fmt.Errorf("failed to ensureDB: %v", err)
-	}
 	log.Println("connected db successfully")
 
 	// spreadsheetのserviceを取得
@@ -114,7 +105,7 @@ func daily(ctx context.Context) error {
 	codeSheet := NewSpreadSheet(srv, mustGetenv("COMPANYCODE_SHEETID"), "tse-first")
 	// ---- ここまで環境変数の取得などの前作業
 
-	holi, err := isHoliday(holidaySheet, now.AddDate(0, 0, -1))
+	holi, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
 	if err != nil {
 		// sheetからデータが取れないだけであればエラー出して処理自体は続ける
 		log.Printf("failed to isHoliday: %v", err)
@@ -125,7 +116,7 @@ func daily(ctx context.Context) error {
 		return nil
 	}
 	// 前の日が土日だったら起動しないで終わる
-	if isSaturdayOrSunday(now.AddDate(0, 0, -1)) {
+	if isSaturdayOrSunday(time.Now().In(jst).AddDate(0, 0, -1)) {
 		log.Println("previous day is saturday or sunday. finish task")
 		return nil
 	}
@@ -199,16 +190,10 @@ func strToInt(s string) int {
 	return i
 }
 
-func ensureDB(db DB) error {
-	// ensure using database
-	res, err := db.SelectDB("select database()")
-	if err != nil {
-		return fmt.Errorf("failed to select database(): %v", err)
+func getDSN(usr, pwd, host string) string {
+	cred := strings.TrimRight(usr, "\n")
+	if pwd != "" {
+		cred = cred + ":" + strings.TrimRight(pwd, "\n")
 	}
-	// database が指定されていなかったらNULLが返る
-	if res[0][0] == "" {
-		return fmt.Errorf("database needs to be used. 'select database()': '%v'", res)
-	}
-	log.Printf("use database %s", res[0][0])
-	return nil
+	return fmt.Sprintf("%s@tcp(%s)/", cred, strings.TrimRight(host, "\n"))
 }
