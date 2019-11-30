@@ -83,14 +83,14 @@ func daily(ctx context.Context) error {
 		db, dberr = NewDB("root@/stockprice_dev")
 	}
 	if dberr != nil {
-		return fmt.Errorf("failed to NewDB: %v", dberr)
+		return fmt.Errorf("failed to NewDB: %w", dberr)
 	}
 	defer db.CloseDB()
 	log.Println("connected db successfully")
 
 	// spreadsheetのserviceを取得
 	sheetCredential := mustGetenv("SHEET_CREDENTIAL")
-	srv, err := getSheetClient(ctx, sheetCredential)
+	srv, err := GetSheetClient(ctx, sheetCredential)
 	if err != nil {
 		return fmt.Errorf("failed to get sheet service. err: %v", err)
 	}

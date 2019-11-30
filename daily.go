@@ -12,9 +12,9 @@ import (
 
 func fetchCompanyCode(s Sheet) ([]string, error) {
 	var codes []string
-	resp, err := s.GetSheetData()
+	resp, err := s.Read()
 	if err != nil {
-		return nil, fmt.Errorf("failed to GetSheetData: %v", err)
+		return nil, fmt.Errorf("failed to ReadSheet: %v", err)
 	}
 	for _, v := range resp {
 		c := v[0]

@@ -38,7 +38,7 @@ type CodeSpreadSheetMock struct {
 	ReadRange     string // sheetのタブ名
 }
 
-func (s CodeSpreadSheetMock) GetSheetData() ([][]string, error) {
+func (s CodeSpreadSheetMock) Read() ([][]string, error) {
 	return [][]string{
 		[]string{"100"},
 		[]string{"101"},
@@ -49,6 +49,14 @@ func (s CodeSpreadSheetMock) GetSheetData() ([][]string, error) {
 		[]string{"106"},
 		[]string{"107"},
 	}, nil
+}
+
+func (s CodeSpreadSheetMock) Insert([][]string) error {
+	return nil
+}
+
+func (s CodeSpreadSheetMock) Update([][]string) error {
+	return nil
 }
 
 func TestFetchStockPrice(t *testing.T) {
