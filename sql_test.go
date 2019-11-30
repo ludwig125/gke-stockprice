@@ -8,6 +8,15 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+func TestEnsureDB(t *testing.T) {
+	defer SetupTestDB(t)()
+
+	db := NewTestDB(t)
+	if err := ensureDB(db); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEnsureDBError(t *testing.T) {
 	d, err := openSQL("root@/") // DB名を指定せずに接続
 	if err != nil {

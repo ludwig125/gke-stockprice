@@ -1,14 +1,11 @@
 package main
 
-import (
-	"testing"
-)
+// import (
+// 	"testing"
 
-func TestEnsureDB(t *testing.T) {
-	defer SetupTestDB(t)()
+// 	"github.com/gke-stockprice/pkg"
+// )
 
-	db := NewTestDB(t)
-	if err := ensureDB(db); err != nil {
-		t.Fatal(err)
-	}
-}
+// func TestPkg(t *testing.T) {
+// 	t.Log(pkg.Value)
+// }

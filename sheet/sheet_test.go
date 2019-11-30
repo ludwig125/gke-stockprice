@@ -1,13 +1,10 @@
-package sheet
+package main
 
 import (
 	"context"
 	"log"
-	"os"
 	"reflect"
 	"testing"
-
-	"github.com/ludwig125/gke-stockprice/sheet"
 )
 
 func TestSheet(t *testing.T) {
@@ -16,13 +13,13 @@ func TestSheet(t *testing.T) {
 
 	sheetCredential := mustGetenv("SHEET_CREDENTIAL")
 	// spreadsheetのserviceを取得
-	srv, err := sheet.GetSheetClient(ctx, sheetCredential)
+	srv, err := GetSheetClient(ctx, sheetCredential)
 	if err != nil {
 		t.Fatalf("failed to get sheet service. err: %v", err)
 	}
 	log.Println("succeeded to get sheet service")
 
-	ts := sheet.NewSpreadSheet(srv, mustGetenv("TEST_SHEET_ID"), "unittest")
+	ts := NewSpreadSheet(srv, mustGetenv("TEST_SHEET_ID"), "unittest")
 
 	testdata := [][]string{
 		[]string{"a", "b", "c"},
@@ -64,15 +61,6 @@ func TestSheet(t *testing.T) {
 	if !reflect.DeepEqual(got, nilSlice) {
 		t.Errorf("got: %#v want: %#v", got, nilSlice)
 	}
-}
-
-func mustGetenv(k string) string {
-	v := os.Getenv(k)
-	if v == "" {
-		log.Fatalf("%s environment variable not set", k)
-	}
-	log.Printf("%s environment variable set", k)
-	return v
 }
 
 // func TestRead(t *testing.T) {
