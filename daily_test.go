@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ludwig125/gke-stockprice/database"
 	"google.golang.org/api/sheets/v4"
 	//_ "github.com/go-sql-driver/mysql"
 )
@@ -60,7 +61,7 @@ func (s CodeSpreadSheetMock) Update([][]string) error {
 }
 
 func TestFetchStockPrice(t *testing.T) {
-	defer SetupTestDB(t)()
+	defer database.SetupTestDB(t)()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -77,7 +78,7 @@ func TestFetchStockPrice(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	db := NewTestDB(t)
+	db := database.NewTestDB(t)
 
 	maxInsertDBNum := 3
 	scrapeInterval := time.Duration(10) * time.Millisecond
@@ -108,9 +109,9 @@ func TestFetchStockPrice(t *testing.T) {
 }
 
 func TestCalculateMovingAvg(t *testing.T) {
-	defer SetupTestDB(t)()
+	defer database.SetupTestDB(t)()
 
-	db := NewTestDB(t)
+	db := database.NewTestDB(t)
 	inputs := [][]string{
 		[]string{"1011", "2019/10/18", "2886", "2913", "2857", "20", "15500", "2874.0"},
 		[]string{"1011", "2019/10/17", "2907", "2907", "2878", "19", "15000", "2883.0"},

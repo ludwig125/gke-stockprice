@@ -3,11 +3,12 @@ package main
 import (
 	"time"
 
+	"github.com/ludwig125/gke-stockprice/sheet"
 	"github.com/pkg/errors"
 )
 
 // spreadsheetの'holiday' sheetを読み取って 与えられた日付が祝日かどうか判断する
-func isHoliday(s Sheet, d time.Time) (bool, error) {
+func isHoliday(s sheet.Sheet, d time.Time) (bool, error) {
 	// 'holiday' sheet を読み取り
 	// sheetには「2019/01/01」の形式の休日が縦一列になっていることを想定している
 	// 東京証券取引所の休日: https://www.jpx.co.jp/corporate/calendar/index.html

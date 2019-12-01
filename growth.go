@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+
+	db "github.com/ludwig125/gke-stockprice/database"
 )
 
-func calculateEachGrowthTrend(db DB, code string) error {
+func calculateEachGrowthTrend(db db.DB, code string) error {
 	day, err := db.SelectDB("SELECT date FROM daily ORDER BY date DESC LIMIT 1")
 	if err != nil {
 		return fmt.Errorf("failed to selectDB: %v", err)
@@ -69,7 +71,7 @@ type MovingAvgs struct {
 }
 
 // 銘柄コード、日付を渡すと該当のmovings structに対応するX日移動平均を返す
-func getMovingAvgs(db DB, code string, date string) (MovingAvgs, error) {
+func getMovingAvgs(db db.DB, code string, date string) (MovingAvgs, error) {
 	ms, err := db.SelectDB(fmt.Sprintf(
 		"SELECT moving5, moving20, moving60, moving100 FROM movingavg WHERE code = %s and date = '%s';", code, date))
 	if err != nil {
