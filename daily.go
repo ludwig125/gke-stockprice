@@ -7,10 +7,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ludwig125/gke-stockprice/database"
+	"github.com/ludwig125/gke-stockprice/sheet"
 	"golang.org/x/sync/errgroup"
 )
 
-func fetchCompanyCode(s Sheet) ([]string, error) {
+func fetchCompanyCode(s sheet.Sheet) ([]string, error) {
 	var codes []string
 	resp, err := s.Read()
 	if err != nil {
@@ -31,7 +33,7 @@ func fetchCompanyCode(s Sheet) ([]string, error) {
 }
 
 func fetchStockPrice(
-	ctx context.Context, db DB,
+	ctx context.Context, db database.DB,
 	codes []string, dailyStockpriceURL string,
 	maxInsertNum int, scrapeInterval time.Duration) ([]string, error) {
 	// scrapeDailyStockPricesで発生したerrorは全部warning扱いにする
@@ -93,7 +95,7 @@ func fetchStockPrice(
 	return warns, nil
 }
 
-func calculateMovingAvg(ctx context.Context, db DB, codes []string, concurrency int) error {
+func calculateMovingAvg(ctx context.Context, db database.DB, codes []string, concurrency int) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	sem := make(chan struct{}, concurrency)
@@ -122,7 +124,7 @@ func calculateMovingAvg(ctx context.Context, db DB, codes []string, concurrency 
 	return nil
 }
 
-func calculateGrowthTrend(ctx context.Context, db DB, codes []string, concurrency int) error {
+func calculateGrowthTrend(ctx context.Context, db database.DB, codes []string, concurrency int) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	sem := make(chan struct{}, concurrency)

@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/ludwig125/gke-stockprice/database"
 )
 
 func TestCalculateEachMovingAvg(t *testing.T) {
-	defer SetupTestDB(t)()
+	defer database.SetupTestDB(t)()
 
-	db := NewTestDB(t)
+	db := database.NewTestDB(t)
 
 	inputs := [][]string{
 		[]string{"1001", "2019/10/18", "2886", "2913", "2857", "20", "15500", "2874.0"},

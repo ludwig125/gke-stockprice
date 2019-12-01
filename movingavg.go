@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+
+	"github.com/ludwig125/gke-stockprice/database"
 )
 
 // TODO: 関数にするかメソッドにするか考える
-func calculateEachMovingAvg(db DB, code string) error {
+func calculateEachMovingAvg(db database.DB, code string) error {
 	// 直近200日分の終値を取得する
 	d, err := getRecentCloses(db, code, 200)
 	if err != nil {
@@ -50,7 +52,7 @@ type DateClose struct {
 }
 
 // 日付の降順で返す
-func getRecentCloses(db DB, code string, limit int) ([]DateClose, error) {
+func getRecentCloses(db database.DB, code string, limit int) ([]DateClose, error) {
 	limitStr := ""
 	if limit != 0 {
 		limitStr = fmt.Sprintf("LIMIT %d", limit)

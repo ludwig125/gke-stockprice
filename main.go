@@ -11,7 +11,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
 	//_ "github.com/go-sql-driver/mysql"
+	"github.com/ludwig125/gke-stockprice/database"
+	"github.com/ludwig125/gke-stockprice/sheet"
 )
 
 var (
@@ -68,19 +71,19 @@ func main() {
 
 func daily(ctx context.Context) error {
 	// 環境変数の読み込み
-	var db DB
+	var db database.DB
 	var dberr error
 	if env == "prod" {
 		// prod環境ならPASSWORD必須
 		log.Println("this is prod. trying to fetch CLOUDSQL_PASSWORD")
-		db, dberr = NewDB(fmt.Sprintf("%s/%s",
+		db, dberr = database.NewDB(fmt.Sprintf("%s/%s",
 			getDSN(mustGetenv("DB_USER"),
 				mustGetenv("DB_PASSWORD"),
 				"127.0.0.1:3306"),
 			"stockprice"))
 	} else {
 		log.Println("this is dev")
-		db, dberr = NewDB("root@/stockprice_dev")
+		db, dberr = database.NewDB("root@/stockprice_dev")
 	}
 	if dberr != nil {
 		return fmt.Errorf("failed to NewDB: %w", dberr)
@@ -90,7 +93,7 @@ func daily(ctx context.Context) error {
 
 	// spreadsheetのserviceを取得
 	sheetCredential := mustGetenv("SHEET_CREDENTIAL")
-	srv, err := GetSheetClient(ctx, sheetCredential)
+	srv, err := sheet.GetSheetClient(ctx, sheetCredential)
 	if err != nil {
 		return fmt.Errorf("failed to get sheet service. err: %v", err)
 	}
@@ -101,8 +104,8 @@ func daily(ctx context.Context) error {
 	scrapeInterval := time.Duration(strToInt(useEnvOrDefault("SCRAPE_INTERVAL", "1000"))) * time.Millisecond // スクレイピングの間隔(millisec)
 	calcMovingavgConcurrency := strToInt(useEnvOrDefault("CALC_MOVINGAVG_CONCURRENCY", "3"))                 // DBへInsertする際の最大件数
 
-	holidaySheet := NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday")
-	codeSheet := NewSpreadSheet(srv, mustGetenv("COMPANYCODE_SHEETID"), "tse-first")
+	holidaySheet := sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday")
+	codeSheet := sheet.NewSpreadSheet(srv, mustGetenv("COMPANYCODE_SHEETID"), "tse-first")
 	// ---- ここまで環境変数の取得などの前作業
 
 	holi, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))

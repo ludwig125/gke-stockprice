@@ -2,12 +2,14 @@ package main
 
 import (
 	"testing"
+
+	"github.com/ludwig125/gke-stockprice/database"
 )
 
 func TestCalculateEachGrowthTrend(t *testing.T) {
-	defer SetupTestDB(t)()
+	defer database.SetupTestDB(t)()
 
-	db := NewTestDB(t)
+	db := database.NewTestDB(t)
 
 	inputsDaily := [][]string{
 		[]string{"1001", "2019/10/18", "2886", "2913", "2857", "100", "15500", "2874.0"},
