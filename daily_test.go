@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/ludwig125/gke-stockprice/database"
 	"google.golang.org/api/sheets/v4"
 	//_ "github.com/go-sql-driver/mysql"
+
+	"github.com/ludwig125/gke-stockprice/database"
 )
 
 func TestFetchCompanyCode(t *testing.T) {
@@ -61,15 +61,15 @@ func (s CodeSpreadSheetMock) Update([][]string) error {
 }
 
 func TestFetchStockPrice(t *testing.T) {
-	defer database.SetupTestDB(t)()
+	defer database.SetupTestDB(t, 3306)()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	testcodes := []string{"1802", "2587", "3382", "4684", "5105", "6506", "6758", "7201", "8058", "9432"}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path                  // クエリの中身を取得
-		code := strings.TrimLeft(path, "/") // 「/」を削除
+		code := r.URL.Query()["scode"][0] // クエリからscodeの値を取得
+		// TODO: scodeの値がない場合のテストどこかでする
 		content, err := ioutil.ReadFile(fmt.Sprintf("testdata/%s.html", code))
 		if err != nil {
 			t.Fatalf("failed to read testfile: %v", err)
@@ -109,7 +109,7 @@ func TestFetchStockPrice(t *testing.T) {
 }
 
 func TestCalculateMovingAvg(t *testing.T) {
-	defer database.SetupTestDB(t)()
+	defer database.SetupTestDB(t, 3306)()
 
 	db := database.NewTestDB(t)
 	inputs := [][]string{
