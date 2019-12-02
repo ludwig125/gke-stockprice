@@ -8,15 +8,38 @@ resources:
 patchesStrategicMerge:
 - map.yaml
 
+# configMapGenerator:
+# - name: sql-proxy-config
+#   behavior: replace
+#   literals:
+#   - db_connection_name=gke-stockprice:us-central1:gke-stockprice-us-central1-db-f1-micro-201911170406
+
+
 configMapGenerator:
-- name: sql-proxy-config
-  behavior: replace
+- name: debug-config
+  behavior: create
   literals:
-  - db_instance=gke-stockprice:us-central1:gke-stockprice-us-central1-db-f1-micro-201911170406
+  - debug=off
+- name: sql-proxy-config
+  behavior: create
+  # literals:
+  # - db_connection_name=gke-stockprice:us-central1:gke-stockprice-integration-test-202001100551
+  files:
+  - db_connection_name=dev_db_connection_name.txt # integration_test内で動的に生成される
+- name: daily-config
+  behavior: create
+  files:
+  - daily_price_url=dev_daily_price_url.txt # integration_test内で動的に生成される
+
 
 secretGenerator:
 - name: db-config
   behavior: create
   files:
-  - db_username=db_username.txt
-  - db_password=db_password.txt
+  - db_username=db_username.txt # integration_test前に配置しておく(echo -n "value" > fileの形で)
+  - db_password=db_password.txt # integration_test前に配置しておく
+- name: sheetids
+  behavior: create
+  files:
+  - holiday_sheetid=dev_sheetid.txt # integration_test前に配置しておく
+  - companycode_sheetid=dev_sheetid.txt # integration_test前に配置しておく

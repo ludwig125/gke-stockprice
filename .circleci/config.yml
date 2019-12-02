@@ -1,5 +1,47 @@
 version: 2
 jobs:
+  test:
+    docker:
+      - image: circleci/golang:1.13
+      # CircleCI MySQL Image https://hub.docker.com/r/circleci/mysql/tags
+      # https://circleci.com/docs/2.0/circleci-images/
+      - image: circleci/mysql:8.0.4
+        environment:
+          MYSQL_USER: root
+          MYSQL_ALLOW_EMPTY_PASSWORD: true
+    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    parallelism: 2 # testの並列実行
+    environment:
+      TZ: Asia/Tokyo # timezoneが合っていないとtestが失敗する
+    steps:
+      - checkout
+      - restore_cache: # 前回の実行以降の変更が検出されなかった場合、保存されているキャッシュを復元
+          keys:
+            - go-mod-v4-{{ checksum "go.sum" }}
+      - run:
+        # Our primary container isn't MYSQL so run a sleep command until it's ready.
+          name: Waiting for MySQL to be ready
+          command: |
+            for i in `seq 1 30`;
+            do
+              nc -z 127.0.0.1 3306 && echo Success && exit 0
+              echo -n .
+              sleep 1
+            done
+            echo Failed waiting for MySQL && exit 1
+      - run:
+          name: test
+          #command: go test -v slack.go slack_test.go
+          #command: go test -v database/database*
+          command: |
+            echo $GCLOUD_SERVICE_KEY | base64 -di > serviceaccount.json
+            SHEET_CREDENTIAL=serviceaccount.json go test -v ./...
+      - save_cache:
+          key: go-mod-v4-{{ checksum "go.sum" }}
+          paths:
+            # go modで取得したバイナリなどは$GOPATH/pkg/mod/以下にキャッシュされる
+            - "/go/pkg/mod"
+
   build:
     environment:
       PROJECT_NAME: gke-stockprice
@@ -27,6 +69,72 @@ jobs:
               docker tag us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:${CIRCLE_BUILD_NUM} us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:${CIRCLE_TAG}
             fi
             docker push us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}
+
+  build-nikkei-mock:
+    environment:
+      PROJECT_NAME: gke-stockprice
+      IMAGE_NAME: gke-nikkei-mock
+    docker:
+      - image: google/cloud-sdk
+    working_directory: /go/src/github.com/ludwig125/gke-stockprice/nikkei-mock
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 18.06.0-ce
+      - run:
+          name: Setup CLOUD SDK
+          command: |
+            # base64 -i ignore non-alphabet characters
+            echo $GCLOUD_SERVICE_KEY | base64 -di > ${HOME}/gcloud-service-key.json
+            gcloud auth activate-service-account --key-file ${HOME}/gcloud-service-key.json
+            gcloud --quiet auth configure-docker
+      - run:
+          name: Docker Build & Push
+          command: |
+            docker build -t us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:${CIRCLE_BUILD_NUM} .
+            docker tag us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:${CIRCLE_BUILD_NUM} us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:latest
+            if [ -n "${CIRCLE_TAG}" ]; then
+              docker tag us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:${CIRCLE_BUILD_NUM} us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}:${CIRCLE_TAG}
+            fi
+            docker push us.gcr.io/${PROJECT_NAME}/${IMAGE_NAME}
+
+  integration-test:
+    docker:
+      - image: google/cloud-sdk
+    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    #parallelism: 2 # testの並列実行
+    environment:
+      TZ: Asia/Tokyo # timezoneが合っていないとtestが失敗する
+    steps:
+      - checkout
+      # - restore_cache: # 前回の実行以降の変更が検出されなかった場合、保存されているキャッシュを復元
+      #     keys:
+      #       - go-mod-v4-{{ checksum "go.sum" }}
+      # - run:
+      #   # Our primary container isn't MYSQL so run a sleep command until it's ready.
+      #     name: Waiting for MySQL to be ready
+      #     command: |
+      #       for i in `seq 1 30`;
+      #       do
+      #         nc -z 127.0.0.1 3306 && echo Success && exit 0
+      #         echo -n .
+      #         sleep 1
+      #       done
+      #       echo Failed waiting for MySQL && exit 1
+      - run:
+          name: integration-test
+          #command: go test -v slack.go slack_test.go
+          #command: go test -v database/database*
+          command: |
+            echo $GCLOUD_SERVICE_KEY | base64 -di > serviceaccount.json
+            SHEET_CREDENTIAL=serviceaccount.json go test -v ./...
+      # - save_cache:
+      #     key: go-mod-v4-{{ checksum "go.sum" }}
+      #     paths:
+      #       # go modで取得したバイナリなどは$GOPATH/pkg/mod/以下にキャッシュされる
+      #       - "/go/pkg/mod"
+
+    
   # deploy:
   #   environment:
   #     PROJECT_NAME: gke-stockprice
@@ -62,6 +170,10 @@ jobs:
   #         name: Install kustomize
   #         # ref. https://github.com/kubernetes-sigs/kustomize/blob/master/docs/INSTALL.md#quickly-curl-the-latest-binary
   #         command: |
+              #  curl -s "https://raw.githubusercontent.com/\
+              #  kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+              # ./kustomize version
+  #
   #           opsys=linux
   #           curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases |\
   #               grep browser_download |\
@@ -185,6 +297,10 @@ workflows:
   master-build:
     jobs:
       - build
+      # - test
+      # - build:
+      #     requires:
+      #       - test
           # filters:
             # branches:
             #   only: master

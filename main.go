@@ -13,6 +13,7 @@ import (
 	"time"
 
 	//_ "github.com/go-sql-driver/mysql"
+
 	"github.com/ludwig125/gke-stockprice/database"
 	"github.com/ludwig125/gke-stockprice/sheet"
 )
@@ -67,26 +68,72 @@ func main() {
 		cancel() // 何らかのエラーが発生した場合、他の処理も全てcancelさせる
 		return
 	}
+
+	// // TODO: あとで以下消す
+	// for i := 0; i < 2000; i++ {
+	// 	select {
+	// 	case <-ctx.Done():
+	// 		return
+	// 	default:
+	// 	}
+	// 	if i%10 == 0 {
+	// 		log.Println("sleep 1 sec:", i)
+	// 	}
+	// 	time.Sleep(1 * time.Second)
+	// }
+
+	log.Println("process finished successfully")
 }
 
 func daily(ctx context.Context) error {
 	// 環境変数の読み込み
 	var db database.DB
-	var dberr error
-	if env == "prod" {
+	switch {
+	case env == "prod":
 		// prod環境ならPASSWORD必須
-		log.Println("this is prod. trying to fetch CLOUDSQL_PASSWORD")
-		db, dberr = database.NewDB(fmt.Sprintf("%s/%s",
-			getDSN(mustGetenv("DB_USER"),
-				mustGetenv("DB_PASSWORD"),
-				"127.0.0.1:3306"),
-			"stockprice"))
-	} else {
-		log.Println("this is dev")
-		db, dberr = database.NewDB("root@/stockprice_dev")
-	}
-	if dberr != nil {
-		return fmt.Errorf("failed to NewDB: %w", dberr)
+		log.Println("this is prod. trying to connect database...")
+
+		// DBにつながるまでretryする
+		if err := retryContext(ctx, 120, 10*time.Second, func() error {
+			var e error
+			db, e = database.NewDB(fmt.Sprintf("%s/%s",
+				getDSN(mustGetenv("DB_USER"),
+					mustGetenv("DB_PASSWORD"),
+					"127.0.0.1:3306"),
+				"stockprice")) // TODO: ここもmustGetenv("DB_NAME")にしていいかも
+			if e != nil {
+				return e
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("failed to NewDB: %w", err)
+		}
+	case env == "dev":
+		log.Println("this is dev. trying to connect database...")
+
+		// DBにつながるまでretryする
+		if err := retryContext(ctx, 120, 10*time.Second, func() error {
+			var e error
+			db, e = database.NewDB(fmt.Sprintf("%s/%s",
+				getDSN(mustGetenv("DB_USER"),
+					"",
+					"127.0.0.1:3306"),
+				"stockprice_dev"))
+			if e != nil {
+				return e
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("failed to NewDB: %w", err)
+		}
+	default:
+		log.Println("this is local")
+
+		var err error
+		db, err = database.NewDB("root@/stockprice_dev")
+		if err != nil {
+			return fmt.Errorf("failed to NewDB: %w", err)
+		}
 	}
 	defer db.CloseDB()
 	log.Println("connected db successfully")
@@ -108,13 +155,13 @@ func daily(ctx context.Context) error {
 	codeSheet := sheet.NewSpreadSheet(srv, mustGetenv("COMPANYCODE_SHEETID"), "tse-first")
 	// ---- ここまで環境変数の取得などの前作業
 
-	holi, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
+	isHoli, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
 	if err != nil {
 		// sheetからデータが取れないだけであればエラー出して処理自体は続ける
 		log.Printf("failed to isHoliday: %v", err)
 	}
 	// 前の日が祝日だったら起動しないで終わる
-	if holi {
+	if err == nil && isHoli {
 		log.Println("previous day is holiday. finish task")
 		return nil
 	}
@@ -123,6 +170,7 @@ func daily(ctx context.Context) error {
 		log.Println("previous day is saturday or sunday. finish task")
 		return nil
 	}
+	//return nil // TODO: 確認用なので後で消す
 
 	// 銘柄一覧の取得
 	codes, err := fetchCompanyCode(codeSheet)
@@ -150,11 +198,16 @@ func daily(ctx context.Context) error {
 		return fmt.Errorf("failed to selectTable %v", err)
 	}
 	//codes := res[0] // selectの結果は２次元配列なので0要素目がcodes
-	if err := calculateMovingAvg(ctx, db, codesFromDB[0], calcMovingavgConcurrency); err != nil {
+	targetCodes := make([]string, len(codesFromDB))
+	for i, c := range codesFromDB {
+		targetCodes[i] = c[0]
+	}
+	log.Printf("moving average target codes: %v", targetCodes)
+	if err := calculateMovingAvg(ctx, db, targetCodes, calcMovingavgConcurrency); err != nil {
 		return err
 	}
 
-	if err := calculateGrowthTrend(ctx, db, codesFromDB[0], calcMovingavgConcurrency); err != nil {
+	if err := calculateGrowthTrend(ctx, db, targetCodes, calcMovingavgConcurrency); err != nil {
 		return err
 	}
 
@@ -174,6 +227,10 @@ func mustGetenv(k string) string {
 		log.Fatalf("%s environment variable not set", k)
 	}
 	log.Printf("%s environment variable set", k)
+
+	// if d := os.Getenv("DEBUG"); d == "on" {
+	// 	log.Printf("%s: %s", k, v)
+	// }
 	return v
 }
 
@@ -198,5 +255,5 @@ func getDSN(usr, pwd, host string) string {
 	if pwd != "" {
 		cred = cred + ":" + strings.TrimRight(pwd, "\n")
 	}
-	return fmt.Sprintf("%s@tcp(%s)/", cred, strings.TrimRight(host, "\n"))
+	return fmt.Sprintf("%s@tcp(%s)", cred, strings.TrimRight(host, "\n"))
 }

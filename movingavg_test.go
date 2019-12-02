@@ -9,7 +9,7 @@ import (
 )
 
 func TestCalculateEachMovingAvg(t *testing.T) {
-	defer database.SetupTestDB(t)()
+	defer database.SetupTestDB(t, 3306)()
 
 	db := database.NewTestDB(t)
 

@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ludwig125/gke-stockprice/database"
 	"github.com/ludwig125/gke-stockprice/sheet"
-	"golang.org/x/sync/errgroup"
 )
 
 func fetchCompanyCode(s sheet.Sheet) ([]string, error) {
@@ -114,14 +115,12 @@ func calculateMovingAvg(ctx context.Context, db database.DB, codes []string, con
 			if err := calculateEachMovingAvg(db, c); err != nil {
 				return fmt.Errorf("failed to calculateEachMovingAvg: %v", err)
 			}
+			log.Printf("calculated code: '%s' moving average successfully", c)
 			return nil
 		})
 	}
 
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return eg.Wait()
 }
 
 func calculateGrowthTrend(ctx context.Context, db database.DB, codes []string, concurrency int) error {

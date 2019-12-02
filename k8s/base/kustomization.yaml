@@ -10,10 +10,15 @@ resources:
 generatorOptions:
   disableNameSuffixhash: true
 
+# configMapGenerator:
+# - name: sql-proxy-config
+#   literals:
+#   - db_connection_name=override.me
+
 configMapGenerator:
-- name: sql-proxy-config
+- name: sheet-config
   literals:
-  - db_instance=override.me
+  - sheet-credential-path=/credential/gke-stockprice-serviceaccount.json
 
 secretGenerator:
 # - name: db-config

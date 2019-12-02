@@ -3,6 +3,7 @@ module github.com/ludwig125/gke-stockprice
 go 1.13
 
 require (
+	github.com/GoogleCloudPlatform/cloudsql-proxy v0.0.0-20191204003823-eaca70f0c07c
 	github.com/PuerkitoBio/goquery v1.5.0
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/nlopes/slack v0.6.0

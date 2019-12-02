@@ -82,12 +82,19 @@ func fetchWebpageDoc(ctx context.Context, code string, dailyStockpriceURL string
 	defer cancel()
 
 	// Request the HTML page.
-	url := dailyStockpriceURL + code
+	url := dailyStockpriceURL
+	//url := dailyStockpriceURL + code
 	log.Printf("trying to fetch daily stockprice. code: %s", code)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to NewRequest: %v", err)
 	}
+	//クエリパラメータに銘柄コードを付与
+	value := req.URL.Query()
+	value.Add("scode", code)
+	req.URL.RawQuery = value.Encode()
+	log.Println("scraping target url:", req.URL.String())
+
 	res, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to DefaultClient.Do: %v", err)

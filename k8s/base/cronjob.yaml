@@ -26,7 +26,7 @@ spec:
             image: us.gcr.io/cloudsql-docker/gce-proxy:1.16
             command: ["/cloud_sql_proxy",
                       #"-instances=gke-stockprice:us-central1:gke-stockprice-us-central1-db-f1-micro-201911170406=tcp:3306",
-                      "-instances=$(DB_INSTANCE)=tcp:3306",
+                      "-instances=$(DB_CONNECTION_NAME)=tcp:3306",
                       #"-instances=gke-stockprice:us-central1:gke-stockprice-us-central1-db-f1-micro-201911170406=tcp:0.0.0.0:3306",
                       "-credential_file=/credential/gke-stockprice-serviceaccount.json"]
             ports:
@@ -37,11 +37,11 @@ spec:
               allowPrivilegeEscalation: false
             # [END cloudsql_security_context]
             env:
-            - name: DB_INSTANCE
+            - name: DB_CONNECTION_NAME
               valueFrom:
                 configMapKeyRef:
                   name: sql-proxy-config
-                  key: db_instance
+                  key: db_connection_name
             volumeMounts:
               - name: serviceaccount-volume
                 mountPath: credential
@@ -62,11 +62,16 @@ spec:
                 configMapKeyRef:
                   name: the-map
                   key: env_number
-            - name: DB_INSTANCE
+            - name: DEBUG
+              valueFrom:
+                configMapKeyRef:
+                  name: debug-config
+                  key: debug
+            - name: DB_CONNECTION_NAME
               valueFrom:
                 configMapKeyRef:
                   name: sql-proxy-config
-                  key: db_instance
+                  key: db_connection_name
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
@@ -77,6 +82,26 @@ spec:
                 secretKeyRef:
                   name: db-config
                   key: db_password
+            - name: SHEET_CREDENTIAL
+              valueFrom:
+                configMapKeyRef:
+                  name: sheet-config
+                  key: sheet-credential-path # 記載しているのは秘密鍵ファイルのパスのみ
+            - name: DAILY_PRICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: daily-config
+                  key: daily_price_url
+            - name: HOLIDAY_SHEETID
+              valueFrom:
+                secretKeyRef:
+                  name: sheetids
+                  key: holiday_sheetid
+            - name: COMPANYCODE_SHEETID
+              valueFrom:
+                secretKeyRef:
+                  name: sheetids
+                  key: companycode_sheetid
             volumeMounts:
               - name: serviceaccount-volume
                 mountPath: credential

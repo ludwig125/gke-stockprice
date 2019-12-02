@@ -20,6 +20,7 @@ RUN go mod verify
 COPY . .
 
 # Build the binary
+# race detector: https://golang.org/doc/articles/race_detector.html
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /go/bin/gke-stockprice
 
 # Second step to build minimal image
