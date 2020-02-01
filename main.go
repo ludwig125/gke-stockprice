@@ -87,53 +87,57 @@ func main() {
 
 func daily(ctx context.Context) error {
 	// 環境変数の読み込み
-	var db database.DB
-	switch {
-	case env == "prod":
-		// prod環境ならPASSWORD必須
-		log.Println("this is prod. trying to connect database...")
+	// var db database.DB
+	// switch {
+	// case env == "prod":
+	// 	// prod環境ならPASSWORD必須
+	// 	log.Println("this is prod. trying to connect database...")
 
-		// DBにつながるまでretryする
-		if err := retryContext(ctx, 120, 10*time.Second, func() error {
-			var e error
-			db, e = database.NewDB(fmt.Sprintf("%s/%s",
-				getDSN(mustGetenv("DB_USER"),
-					mustGetenv("DB_PASSWORD"),
-					"127.0.0.1:3306"),
-				"stockprice")) // TODO: ここもmustGetenv("DB_NAME")にしていいかも
-			if e != nil {
-				return e
-			}
-			return nil
-		}); err != nil {
-			return fmt.Errorf("failed to NewDB: %w", err)
-		}
-	case env == "dev":
-		log.Println("this is dev. trying to connect database...")
+	// 	// DBにつながるまでretryする
+	// 	if err := retryContext(ctx, 120, 10*time.Second, func() error {
+	// 		var e error
+	// 		db, e = database.NewDB(fmt.Sprintf("%s/%s",
+	// 			getDSN(mustGetenv("DB_USER"),
+	// 				mustGetenv("DB_PASSWORD"),
+	// 				"127.0.0.1:3306"),
+	// 			"stockprice")) // TODO: ここもmustGetenv("DB_NAME")にしていいかも
+	// 		if e != nil {
+	// 			return e
+	// 		}
+	// 		return nil
+	// 	}); err != nil {
+	// 		return fmt.Errorf("failed to NewDB: %w", err)
+	// 	}
+	// case env == "dev":
+	// 	log.Println("this is dev. trying to connect database...")
 
-		// DBにつながるまでretryする
-		if err := retryContext(ctx, 120, 10*time.Second, func() error {
-			var e error
-			db, e = database.NewDB(fmt.Sprintf("%s/%s",
-				getDSN(mustGetenv("DB_USER"),
-					"",
-					"127.0.0.1:3306"),
-				"stockprice_dev"))
-			if e != nil {
-				return e
-			}
-			return nil
-		}); err != nil {
-			return fmt.Errorf("failed to NewDB: %w", err)
-		}
-	default:
-		log.Println("this is local")
+	// 	// DBにつながるまでretryする
+	// 	if err := retryContext(ctx, 120, 10*time.Second, func() error {
+	// 		var e error
+	// 		db, e = database.NewDB(fmt.Sprintf("%s/%s",
+	// 			getDSN(mustGetenv("DB_USER"),
+	// 				"",
+	// 				"127.0.0.1:3306"),
+	// 			"stockprice_dev"))
+	// 		if e != nil {
+	// 			return e
+	// 		}
+	// 		return nil
+	// 	}); err != nil {
+	// 		return fmt.Errorf("failed to NewDB: %w", err)
+	// 	}
+	// default:
+	// 	log.Println("this is local")
 
-		var err error
-		db, err = database.NewDB("root@/stockprice_dev")
-		if err != nil {
-			return fmt.Errorf("failed to NewDB: %w", err)
-		}
+	// 	var err error
+	// 	db, err = database.NewDB("root@/stockprice_dev")
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to NewDB: %w", err)
+	// 	}
+	// }
+	db, err := getDatabase(ctx)
+	if err != nil {
+		log.Printf("failed to getDatabase: %v", err)
 	}
 	defer db.CloseDB()
 	log.Println("connected db successfully")
@@ -170,7 +174,6 @@ func daily(ctx context.Context) error {
 		log.Println("previous day is saturday or sunday. finish task")
 		return nil
 	}
-	//return nil // TODO: 確認用なので後で消す
 
 	// 銘柄一覧の取得
 	codes, err := fetchCompanyCode(codeSheet)
@@ -256,4 +259,53 @@ func getDSN(usr, pwd, host string) string {
 		cred = cred + ":" + strings.TrimRight(pwd, "\n")
 	}
 	return fmt.Sprintf("%s@tcp(%s)", cred, strings.TrimRight(host, "\n"))
+}
+
+func getDatabase(ctx context.Context) (database.DB, error) {
+	var db database.DB
+
+	switch {
+	case env == "prod":
+		// prod環境ならPASSWORD必須
+		log.Println("this is prod. trying to connect database...")
+
+		// DBにつながるまでretryする
+		if err := retryContext(ctx, 120, 10*time.Second, func() error {
+			var e error
+			db, e = database.NewDB(fmt.Sprintf("%s/%s",
+				getDSN(mustGetenv("DB_USER"),
+					mustGetenv("DB_PASSWORD"),
+					"127.0.0.1:3306"),
+				"stockprice")) // TODO: ここもmustGetenv("DB_NAME")にしていいかも
+
+			return e
+		}); err != nil {
+			return nil, fmt.Errorf("failed to NewDB: %w", err)
+		}
+	case env == "dev":
+		log.Println("this is dev. trying to connect database...")
+
+		// DBにつながるまでretryする
+		if err := retryContext(ctx, 120, 10*time.Second, func() error {
+			var e error
+			db, e = database.NewDB(fmt.Sprintf("%s/%s",
+				getDSN(mustGetenv("DB_USER"),
+					"",
+					"127.0.0.1:3306"),
+				"stockprice_dev"))
+
+			return e
+		}); err != nil {
+			return nil, fmt.Errorf("failed to NewDB: %w", err)
+		}
+	default:
+		log.Println("this is local")
+
+		var err error
+		db, err = database.NewDB("root@/stockprice_dev")
+		if err != nil {
+			return nil, fmt.Errorf("failed to NewDB: %w", err)
+		}
+	}
+	return db, nil
 }
