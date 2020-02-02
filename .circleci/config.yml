@@ -10,7 +10,7 @@ jobs:
           MYSQL_USER: root
           MYSQL_ALLOW_EMPTY_PASSWORD: true
     working_directory: /go/src/github.com/ludwig125/gke-stockprice
-    parallelism: 2 # testの並列実行
+    #parallelism: 2 # testの並列実行
     environment:
       TZ: Asia/Tokyo # timezoneが合っていないとtestが失敗する
     steps:
@@ -34,8 +34,7 @@ jobs:
           #command: go test -v slack.go slack_test.go
           #command: go test -v database/database*
           command: |
-            echo $GCLOUD_SERVICE_KEY | base64 -di > serviceaccount.json
-            SHEET_CREDENTIAL=serviceaccount.json go test -v ./...
+            go test -v -race -p 1 ./...
       - save_cache:
           key: go-mod-v4-{{ checksum "go.sum" }}
           paths:
@@ -296,14 +295,14 @@ workflows:
   version: 2
   master-build:
     jobs:
-      - build
-      # - test
-      # - build:
-      #     requires:
-      #       - test
-          # filters:
-            # branches:
-            #   only: master
+      # - build
+      - test
+      - build:
+          requires:
+            - test
+          filters:
+            branches:
+              only: master
       # # buildのあとにdeployを実行したい場合は以下を有効にする
       # - deploy:
       #     requires:

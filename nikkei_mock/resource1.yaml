@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gke-nikkei-mock
+  name: gke-nikkei-mock-service
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8181
+  selector:
+    app: gke-nikkei-mock
+    deployment: gke-nikkei-mock
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gke-nikkei-mock
+  name: gke-nikkei-mock-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gke-nikkei-mock
+  template:
+    metadata:
+      labels:
+        app: gke-nikkei-mock
+        deployment: gke-nikkei-mock
+    spec:
+      containers:
+      - command:
+        - /go/bin/gke-nikkei-mock
+        image: us.gcr.io/gke-stockprice/gke-nikkei-mock:latest
+        name: gke-nikkei-mock-container

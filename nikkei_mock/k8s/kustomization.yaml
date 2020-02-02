@@ -1,0 +1,6 @@
+commonLabels:
+  app: gke-nikkei-mock
+
+resources:
+- deployment.yaml
+- service.yaml

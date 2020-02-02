@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/pkg/errors"
 	"golang.org/x/oauth2/google" // to get sheet client
 	"google.golang.org/api/sheets/v4"
 )
@@ -100,7 +99,7 @@ func (s SpreadSheet) Read() ([][]string, error) {
 // Insert write data to spreadsheet without clearing
 func (s SpreadSheet) Insert(inputs [][]string) error {
 	if err := write(s.Service, s.SpreadsheetID, s.ReadRange, inputs); err != nil {
-		return errors.Wrap(err, "write failed")
+		return fmt.Errorf("failed to write sheet: %w", err)
 	}
 	return nil
 }
@@ -108,10 +107,10 @@ func (s SpreadSheet) Insert(inputs [][]string) error {
 // Update clear spreadsheet and write data
 func (s SpreadSheet) Update(inputs [][]string) error {
 	if err := clear(s.Service, s.SpreadsheetID, s.ReadRange); err != nil {
-		return errors.Wrap(err, "clear failed")
+		return fmt.Errorf("failed to clear sheet: %w", err)
 	}
 	if err := write(s.Service, s.SpreadsheetID, s.ReadRange, inputs); err != nil {
-		return errors.Wrap(err, "write failed")
+		return fmt.Errorf("failed to write sheet: %w", err)
 	}
 	return nil
 }
