@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -12,9 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	//_ "github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
+	sheets "google.golang.org/api/sheets/v4"
 
 	"github.com/ludwig125/gke-stockprice/database"
+	"github.com/ludwig125/gke-stockprice/retry"
 	"github.com/ludwig125/gke-stockprice/sheet"
 )
 
@@ -63,8 +64,8 @@ func main() {
 	}()
 
 	// 日時バッチ処理
-	if err := daily(ctx); err != nil {
-		log.Println(err)
+	if err := execDailyProcess(ctx); err != nil {
+		log.Println("failed to execDailyProcess:", err)
 		cancel() // 何らかのエラーが発生した場合、他の処理も全てcancelさせる
 		return
 	}
@@ -85,80 +86,23 @@ func main() {
 	log.Println("process finished successfully")
 }
 
-func daily(ctx context.Context) error {
-	// 環境変数の読み込み
-	// var db database.DB
-	// switch {
-	// case env == "prod":
-	// 	// prod環境ならPASSWORD必須
-	// 	log.Println("this is prod. trying to connect database...")
-
-	// 	// DBにつながるまでretryする
-	// 	if err := retryContext(ctx, 120, 10*time.Second, func() error {
-	// 		var e error
-	// 		db, e = database.NewDB(fmt.Sprintf("%s/%s",
-	// 			getDSN(mustGetenv("DB_USER"),
-	// 				mustGetenv("DB_PASSWORD"),
-	// 				"127.0.0.1:3306"),
-	// 			"stockprice")) // TODO: ここもmustGetenv("DB_NAME")にしていいかも
-	// 		if e != nil {
-	// 			return e
-	// 		}
-	// 		return nil
-	// 	}); err != nil {
-	// 		return fmt.Errorf("failed to NewDB: %w", err)
-	// 	}
-	// case env == "dev":
-	// 	log.Println("this is dev. trying to connect database...")
-
-	// 	// DBにつながるまでretryする
-	// 	if err := retryContext(ctx, 120, 10*time.Second, func() error {
-	// 		var e error
-	// 		db, e = database.NewDB(fmt.Sprintf("%s/%s",
-	// 			getDSN(mustGetenv("DB_USER"),
-	// 				"",
-	// 				"127.0.0.1:3306"),
-	// 			"stockprice_dev"))
-	// 		if e != nil {
-	// 			return e
-	// 		}
-	// 		return nil
-	// 	}); err != nil {
-	// 		return fmt.Errorf("failed to NewDB: %w", err)
-	// 	}
-	// default:
-	// 	log.Println("this is local")
-
-	// 	var err error
-	// 	db, err = database.NewDB("root@/stockprice_dev")
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to NewDB: %w", err)
-	// 	}
-	// }
+func execDailyProcess(ctx context.Context) error {
+	// databaseの取得
 	db, err := getDatabase(ctx)
 	if err != nil {
-		log.Printf("failed to getDatabase: %v", err)
+		return fmt.Errorf("failed to getDatabase: %v", err)
 	}
 	defer db.CloseDB()
 	log.Println("connected db successfully")
 
 	// spreadsheetのserviceを取得
-	sheetCredential := mustGetenv("SHEET_CREDENTIAL")
-	srv, err := sheet.GetSheetClient(ctx, sheetCredential)
+	srv, err := getSheetService(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get sheet service. err: %v", err)
+		return fmt.Errorf("failed to getSheetService: %v", err)
 	}
 	log.Println("got sheet service successfully")
 
-	dailyStockpriceURL := mustGetenv("DAILY_PRICE_URL")                                                      // 日足株価scrape先のURL
-	maxInsertDBNum := strToInt(useEnvOrDefault("MAX_INSERT_DB_NUM", "3"))                                    // DBへInsertする際の最大件数
-	scrapeInterval := time.Duration(strToInt(useEnvOrDefault("SCRAPE_INTERVAL", "1000"))) * time.Millisecond // スクレイピングの間隔(millisec)
-	calcMovingavgConcurrency := strToInt(useEnvOrDefault("CALC_MOVINGAVG_CONCURRENCY", "3"))                 // DBへInsertする際の最大件数
-
 	holidaySheet := sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday")
-	codeSheet := sheet.NewSpreadSheet(srv, mustGetenv("COMPANYCODE_SHEETID"), "tse-first")
-	// ---- ここまで環境変数の取得などの前作業
-
 	isHoli, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
 	if err != nil {
 		// sheetからデータが取れないだけであればエラー出して処理自体は続ける
@@ -176,6 +120,7 @@ func daily(ctx context.Context) error {
 	}
 
 	// 銘柄一覧の取得
+	codeSheet := sheet.NewSpreadSheet(srv, mustGetenv("COMPANYCODE_SHEETID"), "tse-first")
 	codes, err := fetchCompanyCode(codeSheet)
 	if err != nil {
 		return fmt.Errorf("failed to fetchCompanyCode: %v", err)
@@ -184,42 +129,33 @@ func daily(ctx context.Context) error {
 		return errors.New("no target company codes")
 	}
 
-	// 日足株価のスクレイピングとDBへの書き込み
-	warns, err := fetchStockPrice(ctx, db, codes, dailyStockpriceURL, maxInsertDBNum, scrapeInterval)
-	if err != nil {
-		return fmt.Errorf("failed to fetchStockPrice: %v", err)
-	}
+	// 株価trendを表示するためSheet
+	trendSheet := sheet.NewSpreadSheet(srv, mustGetenv("TREND_SHEETID"), "trend")
 
-	// TODO: 全部スクレイピングできていなかったら再度試みる処理を入れたい
-	// TODO: 最初に取得した株価が全部格納されているか確認したい
-
-	// 移動平均線の作成とDBへの書き込み
-	// 最新の日付にある銘柄を取得
-	codesFromDB, err := db.SelectDB(
-		"SELECT code FROM daily WHERE date = (SELECT date FROM daily ORDER BY date DESC LIMIT 1);")
-	if err != nil {
-		return fmt.Errorf("failed to selectTable %v", err)
+	d := daily{
+		dailyStockPrice: DailyStockPrice{
+			db:                 db,
+			dailyStockpriceURL: mustGetenv("DAILY_PRICE_URL"),                                                          // 日足株価scrape先のURL
+			fetchInterval:      time.Duration(strToInt(useEnvOrDefault("SCRAPE_INTERVAL", "1000"))) * time.Millisecond, // スクレイピングの間隔(millisec)
+			fetchTimeout:       time.Duration(strToInt(useEnvOrDefault("SCRAPE_TIMEOUT", "1000"))) * time.Millisecond,  // スクレイピングのtimeout(millisec)
+			currentTime:        time.Now().In(jst),
+		},
+		calculateMovingAvg: CalculateMovingAvg{
+			db:              db,
+			calcConcurrency: strToInt(useEnvOrDefault("CALC_MOVINGAVG_CONCURRENCY", "3")), // 最大同時並行数
+		},
+		calculateGrowthTrend: CalculateGrowthTrend{
+			db:              db,
+			sheet:           trendSheet,
+			calcConcurrency: strToInt(useEnvOrDefault("CALC_GROWTHTREND_CONCURRENCY", "3")), // 最大同時並行数
+			targetDate:      "string",                                                       //TODO
+		},
 	}
-	//codes := res[0] // selectの結果は２次元配列なので0要素目がcodes
-	targetCodes := make([]string, len(codesFromDB))
-	for i, c := range codesFromDB {
-		targetCodes[i] = c[0]
-	}
-	log.Printf("moving average target codes: %v", targetCodes)
-	if err := calculateMovingAvg(ctx, db, targetCodes, calcMovingavgConcurrency); err != nil {
-		return err
-	}
-
-	if err := calculateGrowthTrend(ctx, db, targetCodes, calcMovingavgConcurrency); err != nil {
-		return err
+	if err := d.exec(ctx, codes); err != nil {
+		return fmt.Errorf("failed to daily: %v", err)
 	}
 
 	// 一週間に一度（土曜日？）はbackup
-
-	// 全部終わったあと、warnsをerrorとして返す
-	if len(warns) > 0 {
-		return fmt.Errorf("%s", strings.Join(warns, ","))
-	}
 
 	return nil
 }
@@ -227,7 +163,7 @@ func daily(ctx context.Context) error {
 func mustGetenv(k string) string {
 	v := os.Getenv(k)
 	if v == "" {
-		log.Fatalf("%s environment variable not set", k)
+		log.Panicf("%s environment variable not set", k)
 	}
 	log.Printf("%s environment variable set", k)
 
@@ -248,7 +184,7 @@ func useEnvOrDefault(key, def string) string {
 func strToInt(s string) int {
 	i, err := strconv.Atoi(s)
 	if err != nil {
-		log.Fatalf("failed to convert %s to int", s)
+		log.Panicf("failed to convert %s to int", s)
 	}
 	return i
 }
@@ -270,7 +206,7 @@ func getDatabase(ctx context.Context) (database.DB, error) {
 		log.Println("this is prod. trying to connect database...")
 
 		// DBにつながるまでretryする
-		if err := retryContext(ctx, 120, 10*time.Second, func() error {
+		if err := retry.WithContext(ctx, 120, 10*time.Second, func() error {
 			var e error
 			db, e = database.NewDB(fmt.Sprintf("%s/%s",
 				getDSN(mustGetenv("DB_USER"),
@@ -286,7 +222,7 @@ func getDatabase(ctx context.Context) (database.DB, error) {
 		log.Println("this is dev. trying to connect database...")
 
 		// DBにつながるまでretryする
-		if err := retryContext(ctx, 120, 10*time.Second, func() error {
+		if err := retry.WithContext(ctx, 120, 10*time.Second, func() error {
 			var e error
 			db, e = database.NewDB(fmt.Sprintf("%s/%s",
 				getDSN(mustGetenv("DB_USER"),
@@ -308,4 +244,33 @@ func getDatabase(ctx context.Context) (database.DB, error) {
 		}
 	}
 	return db, nil
+}
+
+func getSheetService(ctx context.Context) (*sheets.Service, error) {
+	c := mustGetenv("SHEET_CREDENTIAL")
+	srv, err := sheet.GetSheetClient(ctx, c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sheet service. err: %v", err)
+	}
+	return srv, nil
+}
+
+// どこか別のファイルに持っていく
+func fetchCompanyCode(s sheet.Sheet) ([]string, error) {
+	var codes []string
+	resp, err := s.Read()
+	if err != nil {
+		return nil, fmt.Errorf("failed to ReadSheet: %v", err)
+	}
+	for _, v := range resp {
+		c := v[0]
+		if c == "" { // 空の場合は登録しない
+			continue
+		}
+		if _, err := strconv.Atoi(c); err != nil {
+			return nil, fmt.Errorf("failed to convert int: %v", err)
+		}
+		codes = append(codes, c)
+	}
+	return codes, nil
 }

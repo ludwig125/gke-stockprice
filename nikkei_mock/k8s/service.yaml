@@ -1,0 +1,12 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: gke-nikkei-mock-service
+spec:
+  selector:
+    deployment: gke-nikkei-mock
+  type: ClusterIP
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8181

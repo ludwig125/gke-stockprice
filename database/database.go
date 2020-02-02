@@ -65,9 +65,9 @@ func openSQL(dataSourceName string) (*sql.DB, error) {
 
 func ensureDB(db DB) error {
 	// ensure using database
-	res, err := db.SelectDB("select database()")
+	res, err := db.SelectDB("SELECT database()")
 	if err != nil {
-		return fmt.Errorf("failed to select database(): %v", err)
+		return fmt.Errorf("failed to SELECT database(): %v", err)
 	}
 	// database が指定されていなかったらNULLが返る
 	if res[0][0] == "" {

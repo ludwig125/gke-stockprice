@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gke-nikkei-mock-deployment
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        deployment: gke-nikkei-mock
+    spec:
+      containers:
+      - name: gke-nikkei-mock-container
+        image: us.gcr.io/gke-stockprice/gke-nikkei-mock:latest
+        command: ["/go/bin/gke-nikkei-mock"]

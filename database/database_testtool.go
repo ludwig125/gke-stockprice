@@ -4,79 +4,97 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"testing"
 )
 
 // SetupTestDB creates test Database and table
 // cleanupTestDB関数を返すので、呼び出し元は"defer SetupTestDB(t)()"
 // とするだけで、test用DatabaseとTableの作成と、テスト終了時の削除を担保できる
-func SetupTestDB(t *testing.T, port int) func() {
+func SetupTestDB(port int) (func(), error) {
 	if port == 0 {
-		t.Fatalf("port is not set. port '%d'", port)
+		return nil, fmt.Errorf("port is not set. port '%d'", port)
 	}
 	log.Println("test database port", port)
-	//db, err := openSQL("root@/") // DB名を指定せずに接続
-	con := fmt.Sprintf("root@tcp(localhost:%d)/", port)
-	db, err := openSQL(con) // DB名を指定せずに接続
+
+	// DB名を指定せずに接続
+	db, err := openSQL(fmt.Sprintf("root@tcp(localhost:%d)/", port))
 	if err != nil {
-		t.Error(err)
+		return nil, fmt.Errorf("failed to openSQL: %v", err)
 	}
 	// Database の作成
-	createTestDB(t, db)
+	if err := createTestDB(db); err != nil {
+		return nil, fmt.Errorf("failed to createTestDB: %v", err)
+	}
 	db.Close()
 
 	// Database 名を指定して接続し直す
 	// ref: https://stackoverflow.com/questions/30235031/how-to-create-a-new-mysql-database-with-go-sql-driver
-	con = fmt.Sprintf("root@tcp(localhost:%d)/stockprice_dev", port)
-	db, err = openSQL(con)
+	db, err = openSQL(fmt.Sprintf("root@tcp(localhost:%d)/stockprice_dev", port))
 	if err != nil {
-		t.Error(err)
+		return nil, fmt.Errorf("failed to openSQL: %v", err)
 	}
 
+	// // stockprice_dev database が存在することを確認
+	// if err := retry.Retry(3, 2*time.Second, func() error {
+	// 	ok, err := existDatabases(db, "stockprice_dev")
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to existDatabases: %v", err)
+	// 	}
+	// 	if !ok {
+	// 		return fmt.Errorf("failed to confirm database: stockprice_dev")
+	// 	}
+	// 	return nil
+	// }); err != nil {
+	// 	return nil, err
+	// }
+
 	// test用tableの作成
-	createTestTable(t, db)
+	if err := createTestTable(db); err != nil {
+		return nil, fmt.Errorf("failed to createTestTable: %v", err)
+	}
 
 	// cleanupTestDB関数を返す
 	return func() {
-		cleanupTestDB(t, db)
-	}
+		cleanupTestDB(db)
+	}, nil
 }
 
 // NewTestDB connect Test DB
-func NewTestDB(t *testing.T) DB {
-	db, err := NewDB("root@/stockprice_dev")
-	if err != nil {
-		t.Errorf("failed to NewDB: %v", err)
-	}
-	return db
+func NewTestDB() (DB, error) {
+	return NewDB("root@/stockprice_dev")
 }
 
 // test用Database作成
-func createTestDB(t *testing.T, db *sql.DB) {
+func createTestDB(db *sql.DB) error {
 	// ref. https://medium.com/@udayakumarvdm/create-mysql-database-using-golang-b28c08e54660
 	_, err := db.Exec("CREATE DATABASE IF NOT EXISTS stockprice_dev")
 	if err != nil {
-		t.Fatalf("failed to createTestDB: %v", err)
+		return fmt.Errorf("failed to CREATE DATABASE: %v", err)
 	}
+	return nil
 }
 
 // test用Databaseの削除
-func cleanupTestDB(t *testing.T, db *sql.DB) {
-	dropTestDB(t, db) // databaseをcloseする前にDROPしないと失敗する
+func cleanupTestDB(db *sql.DB) error {
+	// databaseをcloseする前にDROPしないと失敗する
+	if err := dropTestDB(db); err != nil {
+		return fmt.Errorf("failed to dropTestDB: %v", err)
+	}
 	db.Close()
+	return nil
 }
 
-func dropTestDB(t *testing.T, db *sql.DB) {
+func dropTestDB(db *sql.DB) error {
 	_, err := db.Exec("DROP DATABASE IF EXISTS stockprice_dev")
 	if err != nil {
-		t.Fatalf("failed to dropTestDB: %v", err)
+		return fmt.Errorf("failed to DROP DATABASE: %v", err)
 	}
+	return nil
 }
 
 // test用tableの作成
-func createTestTable(t *testing.T, db *sql.DB) {
+func createTestTable(db *sql.DB) error {
 	tables := []string{
-		`daily (
+		`stockprice_dev.daily (
 		code VARCHAR(10) NOT NULL,
 		date VARCHAR(10) NOT NULL,
 		open VARCHAR(15),
@@ -87,7 +105,7 @@ func createTestTable(t *testing.T, db *sql.DB) {
 		modified VARCHAR(15),
 		PRIMARY KEY( code, date )
 	)`,
-		`movingavg (
+		`stockprice_dev.movingavg (
         code VARCHAR(10) NOT NULL,
         date VARCHAR(10) NOT NULL,
         moving3 DOUBLE,
@@ -98,12 +116,63 @@ func createTestTable(t *testing.T, db *sql.DB) {
         moving60 DOUBLE,
         moving100 DOUBLE,
         PRIMARY KEY( code, date )
-	)`,
-	}
-	for _, table := range tables {
-		_, err := db.Exec("CREATE TABLE IF NOT EXISTS " + table)
-		if err != nil {
-			t.Fatalf("failed to createTestTable: %v", err)
+	)`}
+	for _, ddl := range tables {
+		//log.Println("trying to create table", ddl)
+		if _, err := db.Exec("CREATE TABLE IF NOT EXISTS " + ddl); err != nil {
+			return fmt.Errorf("failed to create TestTable: %v", err)
 		}
 	}
+	return nil
 }
+
+// func existDatabases(db *sql.DB, targetDB string) (bool, error) {
+// 	databases, err := listDatabases(db)
+// 	if err != nil {
+// 		return false, fmt.Errorf("failed to listDatabases: %v", err)
+// 	}
+// 	for _, d := range databases {
+// 		if d == targetDB {
+// 			log.Println("databases:", databases, ", targetDB:", targetDB)
+// 			return true, nil
+// 		}
+// 	}
+// 	// 見つけられなかった場合はfalseを返す
+// 	return false, nil
+// }
+
+// func listDatabases(db *sql.DB) ([]string, error) {
+// 	rows, err := db.Query("SHOW DATABASES")
+// 	if err != nil {
+// 		return nil, fmt.Errorf("Could not query db: %v", err)
+// 	}
+// 	defer rows.Close()
+
+// 	var databases []string
+// 	for rows.Next() {
+// 		var dbName string
+// 		if err := rows.Scan(&dbName); err != nil {
+// 			return nil, fmt.Errorf("Could not scan result: %v", err)
+// 		}
+// 		databases = append(databases, dbName)
+// 	}
+// 	return databases, nil
+// }
+
+// func listTables(db *sql.DB) ([]string, error) {
+// 	rows, err := db.Query("SHOW TABLES")
+// 	if err != nil {
+// 		return nil, fmt.Errorf("Could not query db: %v", err)
+// 	}
+// 	defer rows.Close()
+
+// 	var tables []string
+// 	for rows.Next() {
+// 		var dbName string
+// 		if err := rows.Scan(&dbName); err != nil {
+// 			return nil, fmt.Errorf("Could not scan result: %v", err)
+// 		}
+// 		tables = append(tables, dbName)
+// 	}
+// 	return tables, nil
+// }

@@ -71,7 +71,11 @@ func TestGKEStockPrice(t *testing.T) {
 	}
 	// test用databaseとtableの作成
 	// deferによってテスト終了時に削除する
-	defer database.SetupTestDB(t, 3307) // 3307 はCloudSQL用のport
+	cleanup, err := database.SetupTestDB(3307) // 3307 はCloudSQL用のport
+	if err != nil {
+		t.Fatalf("failed to SetupTestDB: %v", err)
+	}
+	defer cleanup()
 
 	// GKECluster作成
 	if err := setupGKECluster(cluster); err != nil {
@@ -240,7 +244,7 @@ func startCloudSQLProxy(instance cloudSQLInstance) error {
 func checkTestDataInDBSheet(ctx context.Context) error {
 	var db database.DB
 	// DBにつながるまでretryする
-	if err := retryContext(ctx, 20, 3*time.Second, func() error {
+	if err := WithContext(ctx, 20, 3*time.Second, func() error {
 		var e error
 		db, e = database.NewDB(fmt.Sprintf("%s/%s",
 			getDSN("root", "", "127.0.0.1:3307"),
@@ -253,7 +257,7 @@ func checkTestDataInDBSheet(ctx context.Context) error {
 		return fmt.Errorf("failed to NewDB: %w", err)
 	}
 
-	if err := retryContext(ctx, 20, 5*time.Second, func() error {
+	if err := WithContext(ctx, 20, 5*time.Second, func() error {
 		ret, err := db.SelectDB("SHOW DATABASES")
 		if err != nil {
 			return fmt.Errorf("failed to SelectDB: %v", err)

@@ -1,4 +1,4 @@
-package main
+package retry
 
 import (
 	"context"
@@ -6,7 +6,8 @@ import (
 	"time"
 )
 
-func retry(limit int, interval time.Duration, fn func() error) error {
+// Retry is retry function.
+func Retry(limit int, interval time.Duration, fn func() error) error {
 	attempt := 1
 	for {
 		err := fn()
@@ -24,7 +25,8 @@ func retry(limit int, interval time.Duration, fn func() error) error {
 	}
 }
 
-func retryContext(ctx context.Context, limit int, interval time.Duration, fn func() error) error {
+// WithContext is retry function with context.
+func WithContext(ctx context.Context, limit int, interval time.Duration, fn func() error) error {
 	attempt := 1
 	for {
 		select {

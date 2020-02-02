@@ -9,9 +9,17 @@ import (
 )
 
 func TestEnsureDB(t *testing.T) {
-	defer SetupTestDB(t, 3306)()
+	//defer SetupTestDB(t, 3306)()
+	cleanup, err := SetupTestDB(3306)
+	if err != nil {
+		t.Fatalf("failed to SetupTestDB: %v", err)
+	}
+	defer cleanup()
 
-	db := NewTestDB(t)
+	db, err := NewTestDB()
+	if err != nil {
+		t.Fatalf("failed to NewTestDB: %v", err)
+	}
 	if err := ensureDB(db); err != nil {
 		t.Fatal(err)
 	}
@@ -32,11 +40,20 @@ func TestEnsureDBError(t *testing.T) {
 }
 
 func TestInsertSelectDB(t *testing.T) {
-	defer SetupTestDB(t, 3306)()
+	//defer SetupTestDB(t, 3306)()
+	cleanup, err := SetupTestDB(3306)
+	if err != nil {
+		t.Fatalf("failed to SetupTestDB: %v", err)
+	}
+	defer cleanup()
 
 	// DBに新規接続
 	// openSQLとは異なり"DB"を取得する
-	db := NewTestDB(t)
+	//db := NewTestDB(t)
+	db, err := NewTestDB()
+	if err != nil {
+		t.Fatalf("failed to NewTestDB: %v", err)
+	}
 	inputs := [][]string{
 		[]string{"1001", "2019/05/16", "4826", "4866", "4790", "4800", "5440600", "4800.0"},
 		[]string{"1001", "2019/05/15", "4841", "4854", "4781", "4854", "5077200", "4854.0"},

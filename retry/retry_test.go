@@ -1,4 +1,4 @@
-package main
+package retry
 
 import (
 	"testing"
@@ -41,7 +41,7 @@ func TestRetry(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			count = 0
-			if err := retry(tt.limit, interval, tt.fn); err != nil {
+			if err := Retry(tt.limit, interval, tt.fn); err != nil {
 				// エラー文が想定通りか比較
 				if err.Error() != tt.wantErr.Error() {
 					t.Errorf("got error: %#v, want error: %#v", err.Error(), tt.wantErr.Error())
