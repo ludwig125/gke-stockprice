@@ -24,7 +24,7 @@ func TestSheet(t *testing.T) {
 	}
 	log.Println("succeeded to get sheet service")
 
-	ts := sheet.NewSpreadSheet(srv, mustGetenv("TEST_SHEET_ID"), "unittest")
+	ts := sheet.NewSpreadSheet(srv, mustGetenv("INTEGRATION_TEST_SHEETID"), "unittest")
 
 	testdata := [][]string{
 		[]string{"a", "b", "c"},
@@ -89,7 +89,7 @@ func mustGetenv(k string) string {
 // 	}
 // 	log.Println("succeeded to get sheet service")
 
-// 	testSheetID := mustGetenv("TEST_SHEET_ID")
+// 	testSheetID := mustGetenv("INTEGRATION_TEST_SHEETID")
 // 	t.Run("testSheet", func(t *testing.T) {
 // 		testHolidaySheet(t, srv, testSheetID)
 // 		testCodeSheet(t, srv, testSheetID)
@@ -140,7 +140,7 @@ func mustGetenv(k string) string {
 // 		t.Fatalf("failed to get sheet service. err: %v", err)
 // 	}
 // 	log.Println("succeeded to get sheet service")
-// 	sid := mustGetenv("TEST_SHEET_ID")
+// 	sid := mustGetenv("INTEGRATION_TEST_SHEETID")
 
 // 	si := SpreadSheet{
 // 		Service:       srv,

@@ -1,21 +1,21 @@
 // +build integration
 
-package main
+package gcloud
 
 import (
 	"testing"
 )
 
-func TestCreateDeletecloudSQLInstance(t *testing.T) {
+func TestCreateDeleteInstance(t *testing.T) {
 	cases := []struct {
 		name       string
-		instance   cloudSQLInstance
+		instance   CloudSQLInstance
 		wantStdout string
 		wantErr    string
 	}{
 		{
 			name: "match_condition",
-			instance: cloudSQLInstance{
+			instance: CloudSQLInstance{
 				Project:  "gke-stockprice",
 				Instance: "gke-stockprice-integration-test",
 				Tier:     "db-f1-micro",
@@ -27,7 +27,7 @@ func TestCreateDeletecloudSQLInstance(t *testing.T) {
 		},
 		{
 			name: "not_match_condition",
-			instance: cloudSQLInstance{
+			instance: CloudSQLInstance{
 				Project:  "gke-stockprice",
 				Instance: "gke-stockprice-integration2-test",
 				Tier:     "db-f1-micro",
@@ -41,7 +41,7 @@ func TestCreateDeletecloudSQLInstance(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			i := tt.instance
-			if err := i.createInstance(); err != nil {
+			if err := i.CreateInstance(); err != nil {
 				if err.Error() != tt.wantErr {
 					t.Fatalf("got error: %v want error: %s", err, tt.wantErr)
 				}
@@ -50,7 +50,7 @@ func TestCreateDeletecloudSQLInstance(t *testing.T) {
 			// 	t.Errorf("got stdout: %s want stdout: %s", got.Stdout, tt.wantStdout)
 			// }
 
-			if err := i.deleteInstance(); err != nil {
+			if err := i.DeleteInstance(); err != nil {
 				if err.Error() != tt.wantErr {
 					t.Fatalf("got error: %v want error: %s", err, tt.wantErr)
 				}
@@ -62,44 +62,67 @@ func TestCreateDeletecloudSQLInstance(t *testing.T) {
 	}
 }
 
-func TestListcloudSQLInstance(t *testing.T) {
+func TestListInstance(t *testing.T) {
 	cases := []struct {
 		name       string
-		instance   cloudSQLInstance
+		instance   CloudSQLInstance
 		wantStdout string
-		wantErr    string
+		wantErr    bool
 	}{
 		{
 			name: "match_projectid",
-			instance: cloudSQLInstance{
-				Project:  "gke-stockprice",
+			instance: CloudSQLInstance{
+				Project: "gke-stockprice",
+				//Instance: "gke-stockprice-integration-test-202003240621",
 				Instance: "gke-stockprice-integration-test",
 				Tier:     "db-f1-micro",
 				Region:   "us-central1",
 				ExecCmd:  false,
 			},
-			wantErr: "failed to Pages: failed to find instance: gke-stockprice-integration-test",
+			wantErr: false,
 		},
 		{
 			name: "not_match_projectid",
-			instance: cloudSQLInstance{
+			instance: CloudSQLInstance{
 				Project:  "gke-stockprice-test",
 				Instance: "gke-stockprice-integration2-test",
 				Tier:     "db-f1-micro",
 				Region:   "us-central1",
 				ExecCmd:  false,
 			},
-			wantErr: "failed to Pages: googleapi: Error 400: Project specified in the request is invalid., errorInvalidProject",
+			wantErr: true,
 		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			i := tt.instance
-			if _, err := i.listInstance(); err != nil {
-				if err.Error() != tt.wantErr {
-					t.Fatalf("got error: %v want error: %s", err, tt.wantErr)
-				}
+			// if _, err := i.ListInstance(); (err != nil) != tt.wantErr {
+			// 	t.Errorf("error: %v, wantErr: %v", err, tt.wantErr)
+			// 	return
+			// }
+			res, err := i.ListInstance()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error: %v, wantErr: %v", err, tt.wantErr)
+				return
 			}
+			t.Log(res)
 		})
 	}
+}
+
+func TestExistCloudSQLInstance(t *testing.T) {
+	i := CloudSQLInstance{
+		Project:  "gke-stockprice-test",
+		Instance: "gke-stockprice-integration-test-202003240621",
+		Tier:     "db-f1-micro",
+		Region:   "us-central1",
+		ExecCmd:  false,
+	}
+	ok, err := i.ExistCloudSQLInstance()
+	wantErr := false
+	if (err != nil) != wantErr {
+		t.Errorf("error: %v, wantErr: %v", err, wantErr)
+		return
+	}
+	t.Log(ok)
 }

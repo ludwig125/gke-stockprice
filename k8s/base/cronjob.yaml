@@ -102,6 +102,16 @@ spec:
                 secretKeyRef:
                   name: sheetids
                   key: companycode_sheetid
+            - name: TREND_SHEETID
+              valueFrom:
+                secretKeyRef:
+                  name: sheetids
+                  key: trend_sheetid
+            - name: GROWTHTREND_TARGETDATE
+              valueFrom:
+                configMapKeyRef:
+                  name: growthtrend-config
+                  key: growthtrend_targetdate
             volumeMounts:
               - name: serviceaccount-volume
                 mountPath: credential

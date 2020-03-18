@@ -147,8 +147,8 @@ func execDailyProcess(ctx context.Context) error {
 		calculateGrowthTrend: CalculateGrowthTrend{
 			db:              db,
 			sheet:           trendSheet,
-			calcConcurrency: strToInt(useEnvOrDefault("CALC_GROWTHTREND_CONCURRENCY", "3")), // 最大同時並行数
-			targetDate:      "string",                                                       //TODO
+			calcConcurrency: strToInt(useEnvOrDefault("CALC_GROWTHTREND_CONCURRENCY", "3")),                               // 最大同時並行数
+			targetDate:      useEnvOrDefault("GROWTHTREND_TARGETDATE", time.Now().AddDate(0, 0, -1).Format("2006/01/02")), // defaultは起動日の前日
 		},
 	}
 	if err := d.exec(ctx, codes); err != nil {

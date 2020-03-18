@@ -1,6 +1,6 @@
 // +build integration
 
-package main
+package gcloud
 
 import (
 	"fmt"
@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/ludwig125/gke-stockprice/command"
+	"github.com/ludwig125/gke-stockprice/retry"
 )
 
-type gkeCluster struct {
+// GKECluster has GKE cluster information.
+type GKECluster struct {
 	Project     string
 	ClusterName string
 	ComputeZone string
@@ -19,7 +21,7 @@ type gkeCluster struct {
 	ExecCmd     bool
 }
 
-func (c gkeCluster) createCluster() error {
+func (c GKECluster) CreateCluster() error {
 	if !strings.Contains(c.ClusterName, "integration-test") {
 		return fmt.Errorf("cluster name should contains 'integration-test'. cluster: %s", c.ClusterName)
 	}
@@ -39,7 +41,7 @@ func (c gkeCluster) createCluster() error {
 	return nil
 }
 
-func (c gkeCluster) deleteCluster() error {
+func (c GKECluster) DeleteCluster() error {
 	if !strings.Contains(c.ClusterName, "integration-test") {
 		return fmt.Errorf("cluster name should contains 'integration-test'. cluster: %s", c.ClusterName)
 	}
@@ -57,7 +59,7 @@ func (c gkeCluster) deleteCluster() error {
 	return nil
 }
 
-func (c gkeCluster) listCluster() (*gkeClusterListed, error) {
+func (c GKECluster) ListCluster() (*GKEClusterListed, error) {
 	// APIを使った方法がうまく行かなかったのでgcloudコマンドを直接使う方法にした
 
 	if !strings.Contains(c.ClusterName, "integration-test") {
@@ -93,8 +95,8 @@ func (c gkeCluster) listCluster() (*gkeClusterListed, error) {
 	return nil, nil
 }
 
-//func (c gkeCluster) listCluster() (*container.ListClustersResponse, error) {
-// func (c gkeCluster) listCluster() error {
+//func (c GKECluster) ListCluster() (*container.ListClustersResponse, error) {
+// func (c GKECluster) ListCluster() error {
 // 	// 参考
 // 	// list API: https://cloud.google.com/kubernetes-engine/docs/reference/rest/v1/projects.locations.clusters/list?hl=ja
 //  // https://godoc.org/google.golang.org/api/container/v1#ProjectsLocationsClustersService
@@ -134,7 +136,7 @@ func (c gkeCluster) listCluster() (*gkeClusterListed, error) {
 // 	return nil
 // }
 
-type gkeClusterListed struct {
+type GKEClusterListed struct {
 	Name          string // NAME
 	Location      string // LOCATION
 	MasterVersion string // MASTER_VERSION
@@ -145,8 +147,8 @@ type gkeClusterListed struct {
 	Status        string // STATUS
 }
 
-func formatlistedCluster(s string) ([]gkeClusterListed, error) {
-	var listed []gkeClusterListed
+func formatlistedCluster(s string) ([]GKEClusterListed, error) {
+	var listed []GKEClusterListed
 
 	lines := strings.Split(s, "\n") // 改行区切りでlinesに格納
 	for i, l := range lines {
@@ -157,7 +159,7 @@ func formatlistedCluster(s string) ([]gkeClusterListed, error) {
 				return nil, fmt.Errorf("format error.\n got '%v'\nexpected format 'NAME LOCATION MASTER_VERSION MASTER_IP MACHINE_TYPE NODE_VERSION NUM_NODES STATUS'", col)
 			}
 		} else {
-			c := gkeClusterListed{
+			c := GKEClusterListed{
 				Name:          col[0],
 				Location:      col[1],
 				MasterVersion: col[2],
@@ -173,11 +175,11 @@ func formatlistedCluster(s string) ([]gkeClusterListed, error) {
 	return listed, nil
 }
 
-func (c gkeCluster) confirmClusterStatus(wantStatus string) error {
-	if err := retry(30, 20*time.Second, func() error {
-		l, err := c.listCluster()
+func (c GKECluster) ConfirmClusterStatus(wantStatus string) error {
+	if err := retry.Retry(30, 20*time.Second, func() error {
+		l, err := c.ListCluster()
 		if err != nil {
-			return fmt.Errorf("failed to listCluster: %w", err)
+			return fmt.Errorf("failed to ListCluster: %w", err)
 		}
 		if l.Status != wantStatus {
 			return fmt.Errorf("not matched. current: %s, expected: %s", l.Status, wantStatus)
@@ -186,6 +188,28 @@ func (c gkeCluster) confirmClusterStatus(wantStatus string) error {
 	}); err != nil {
 		return fmt.Errorf("failed to confirm gke cluster status: %w", err)
 	}
+	return nil
+}
+
+func (c GKECluster) GetCredentials() error {
+	cmd := fmt.Sprintf("gcloud config set container/cluster %s", c.ClusterName)
+	res, err := command.ExecAndWait(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
+	}
+
+	cmd = fmt.Sprintf("gcloud config set compute/zone %s", c.ComputeZone)
+	res, err = command.ExecAndWait(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
+	}
+
+	cmd = fmt.Sprintf("gcloud container clusters get-credentials %s", c.ClusterName)
+	res, err = command.ExecAndWait(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
+	}
+	log.Println("get-credentials successfully")
 	return nil
 }
 
@@ -202,22 +226,22 @@ func (c gkeCluster) confirmClusterStatus(wantStatus string) error {
 // 	return nil
 // }
 
-type gkeSecretFile struct {
-	filename string
-	content  string
+type GKESecretFile struct {
+	Filename string
+	Content  string
 }
 
-func gkeSetFilesForDevEnv(path string, files []gkeSecretFile) error {
+func GKESetFilesForDevEnv(path string, files []GKESecretFile) error {
 	for _, f := range files {
 		// path: ex. "./k8s/overlays/dev/"
-		fmt.Println("filename:", f.filename)
-		fmt.Println("content:", f.content)
+		fmt.Println("filename:", f.Filename)
+		fmt.Println("content:", f.Content)
 		// 改行入れると正しく認識されないので改行を削る
 		// 例
 		//   2020/01/11 22:50:08 errors parsing config:
 		//   googleapi: Error 400: Invalid request: instance name (gke-stockprice-integration-test-202001100551
 		//   )., invalid
-		cmd := fmt.Sprintf("echo -n '%s' > %s%s", f.content, path, f.filename)
+		cmd := fmt.Sprintf("echo -n '%s' > %s%s", f.Content, path, f.Filename)
 		res, err := command.ExecAndWait(cmd)
 		if err != nil {
 			return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
@@ -226,9 +250,9 @@ func gkeSetFilesForDevEnv(path string, files []gkeSecretFile) error {
 	return nil
 }
 
-func gkeDeploy(path string) error {
+func GKEDeploy(path string) error {
 	// path: ex. "./k8s/overlays/dev/"
-	cmd := fmt.Sprintf("kustomize build %s | /usr/bin/kubectl apply -f -", path)
+	cmd := fmt.Sprintf("./kustomize build %s | /usr/bin/kubectl apply -f -", path)
 	res, err := command.ExecAndWait(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)

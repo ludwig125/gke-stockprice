@@ -6,12 +6,16 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/ludwig125/gke-stockprice/command"
 	"github.com/ludwig125/gke-stockprice/database"
+	"github.com/ludwig125/gke-stockprice/gcloud"
+	"github.com/ludwig125/gke-stockprice/retry"
+	"github.com/ludwig125/gke-stockprice/sheet"
 )
 
 func TestGKEStockPrice(t *testing.T) {
@@ -29,33 +33,37 @@ func TestGKEStockPrice(t *testing.T) {
 	        NAME                     DATABASE_VERSION  LOCATION       TIER         PRIMARY_ADDRESS  PRIVATE_ADDRESS  STATUS
 			gke-stockprice-testdb    MYSQL_5_7         us-central1-c  db-f1-micro  34.66.91.128     -                STOPPED
 	*/
-	instance := cloudSQLInstance{
+
+	instance := gcloud.CloudSQLInstance{
 		Project: "gke-stockprice",
-		//Instance: "gke-stockprice-integration-test-202001200539",
+		//Instance: "gke-stockprice-integration-test-202003240621",
 		Instance:     "gke-stockprice-integration-test-" + time.Now().Format("200601021504"),
 		Tier:         "db-f1-micro",
 		Region:       "us-central1",
 		DatabaseName: "stockprice_dev",
-		ExecCmd:      true,
+		ExecCmd:      true, // 実際に作成削除を行う
 	}
 
 	// test用GKEクラスタ
-	cluster := gkeCluster{
+	cluster := gcloud.GKECluster{
 		Project:     "gke-stockprice",
 		ClusterName: "gke-stockprice-integration-test",
 		ComputeZone: "us-central1-a",
 		MachineType: "g1-small",
-		ExecCmd:     true,
+		ExecCmd:     true, // 実際に作成削除を行う
 	}
 	defer func() {
-		if err := instance.deleteInstance(); err != nil {
-			t.Errorf("failed to deleteInstance: %#v", err)
+		log.Println("integration test finished")
+	}()
+	defer func() {
+		if err := instance.DeleteInstance(); err != nil {
+			t.Errorf("failed to DeleteInstance: %#v", err)
 		}
 		log.Printf("delete SQL instance %#v successfully", instance)
 	}()
 	defer func() {
-		if err := cluster.deleteCluster(); err != nil {
-			t.Errorf("failed to deleteCluster: %#v", err)
+		if err := cluster.DeleteCluster(); err != nil {
+			t.Errorf("failed to DeleteCluster: %#v", err)
 		}
 		log.Printf("delete GKE cluster %#v successfully", cluster.ClusterName)
 	}()
@@ -71,11 +79,12 @@ func TestGKEStockPrice(t *testing.T) {
 	}
 	// test用databaseとtableの作成
 	// deferによってテスト終了時に削除する
-	cleanup, err := database.SetupTestDB(3307) // 3307 はCloudSQL用のport
+	_, err := database.SetupTestDB(3307) // 3307 はCloudSQL用のport
+	//cleanup, err := database.SetupTestDB(3307) // 3307 はCloudSQL用のport
 	if err != nil {
 		t.Fatalf("failed to SetupTestDB: %v", err)
 	}
-	defer cleanup()
+	//defer cleanup()
 
 	// GKECluster作成
 	if err := setupGKECluster(cluster); err != nil {
@@ -103,9 +112,13 @@ func TestGKEStockPrice(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	// retryしながら、CloudSQLとSpreadsheetにデータが入るまで待つ
-	if err := checkTestDataInDBSheet(ctx); err != nil {
-		t.Fatalf("failed to checkTestDataInDBSheet: %v", err)
+	// retryしながらCloudSQLにデータが入るまで待つ
+	if err := checkTestDataInDB(ctx); err != nil {
+		t.Errorf("failed to checkTestDataInDB: %v", err)
+	}
+	// retryしながらSpreadsheetにデータが入るまで待つ
+	if err := checkTestDataInSheet(ctx); err != nil {
+		t.Errorf("failed to checkTestDataInSheet: %v", err)
 	}
 
 	// 成功したら、一旦cronを止めて、
@@ -117,74 +130,68 @@ func TestGKEStockPrice(t *testing.T) {
 
 }
 
-func setupSQLInstance(instance cloudSQLInstance) error {
+func setupSQLInstance(instance gcloud.CloudSQLInstance) error {
 	// すでにSQLInstanceが存在するかどうか確認
-	ist, err := instance.listInstance()
+	ist, err := instance.ListInstance()
 	if err != nil {
-		return fmt.Errorf("failed to listInstance: %#v", err)
+		return fmt.Errorf("failed to ListInstance: %#v", err)
 	}
+	//fmt.Println(ist) // TODO
+
 	// SQLInstanceがないなら作る
 	if ist == nil {
 		log.Println("SQL Instance does not exists. trying to create...")
-		if err := instance.createInstance(); err != nil {
-			return fmt.Errorf("failed to createInstance: %#v", err)
+		if err := instance.CreateInstance(); err != nil {
+			return fmt.Errorf("failed to CreateInstance: %#v", err)
 		}
 	}
 	// RUNNABLEかどうか確認する
-	if err := instance.confirmcloudSQLInstanceStatus("RUNNABLE"); err != nil {
-		return fmt.Errorf("failed to confirmcloudSQLInstanceStatus: %w", err)
+	if err := instance.ConfirmCloudSQLInstanceStatus("RUNNABLE"); err != nil {
+		return fmt.Errorf("failed to ConfirmCloudSQLInstanceStatus: %w", err)
 	}
 
-	// // テスト用Databaseを作成
-	// if err := instance.findDatabase(); err != nil {
-	// 	// まだないなら作る
-	// 	if err2 := instance.createTestDatabase(); err2 != nil {
-	// 		return fmt.Errorf("failed to createTestDatabase: %w", err2)
-	// 	}
-	// }
-
-	// // テスト用Databaseが作成されたか確認
-	// if err := instance.findDatabase(); err != nil {
-	// 	return fmt.Errorf("failed to findDatabase: %w", err)
-	// }
 	return nil
 }
 
-func setupGKECluster(cluster gkeCluster) error {
+func setupGKECluster(cluster gcloud.GKECluster) error {
 	// すでにSQLInstanceが存在するかどうか確認
-	clList, err := cluster.listCluster()
+	clList, err := cluster.ListCluster()
 	if err != nil {
-		return fmt.Errorf("failed to listCluster: %w", err)
+		return fmt.Errorf("failed to ListCluster: %w", err)
 	}
 	//fmt.Println(clList)
 	// GKEクラスタがないときは作成する
 	if clList == nil {
 		log.Println("GKE cluster does not exists. trying to create...")
-		if cluster.createCluster(); err != nil {
-			return fmt.Errorf("failed to createCluster: %#v", err)
+		if cluster.CreateCluster(); err != nil {
+			return fmt.Errorf("failed to CreateCluster: %#v", err)
 		}
 	}
 
-	if err := cluster.confirmClusterStatus("RUNNING"); err != nil {
-		return fmt.Errorf("failed to confirmClusterStatus: %w", err)
+	if err := cluster.ConfirmClusterStatus("RUNNING"); err != nil {
+		return fmt.Errorf("failed to ConfirmClusterStatus: %w", err)
+	}
+
+	if err := cluster.GetCredentials(); err != nil {
+		return fmt.Errorf("failed to GetCredentials: %w", err)
 	}
 
 	return nil
 }
 
 func deployGKENikkeiMock() error {
-	if err := gkeDeploy("./nikkei_mock/k8s/"); err != nil {
+	if err := gcloud.GKEDeploy("./nikkei_mock/k8s/"); err != nil {
 		return fmt.Errorf("failed to deploy: %#v", err)
 	}
 	return nil
 }
 
-func deployGKEStockprice(instance cloudSQLInstance) error {
+func deployGKEStockprice(instance gcloud.CloudSQLInstance) error {
 	fmt.Printf("instance: \n    %#v\n", instance)
 
-	ist, err := instance.listInstance()
+	ist, err := instance.ListInstance()
 	if err != nil {
-		return fmt.Errorf("failed to listInstance: %v", err)
+		return fmt.Errorf("failed to ListInstance: %v", err)
 	}
 
 	clusterIP, err := nikkeiMockClusterIP()
@@ -192,24 +199,35 @@ func deployGKEStockprice(instance cloudSQLInstance) error {
 		return fmt.Errorf("failed to nikkeiMockClusterIP: %v", err)
 	}
 
+	// nikkei mockの直近のテストデータをtargetDateとしてGROWTHTREND_TARGETDATEに設定する
+	targetDate, err := formatDate(time.Now(), "5/16") // testdataの最新の日付
+	if err != nil {
+		return fmt.Errorf("failed to formatDate: %v", err)
+	}
+
+	// TODO "secret" じゃなくて普通にConfigでいい気がする
 	// Secretを環境変数として読み込むためにファイルを配置する
-	secretFiles := []gkeSecretFile{
-		gkeSecretFile{
-			filename: "dev_db_connection_name.txt",
-			content:  ist.ConnectionName,
+	secretFiles := []gcloud.GKESecretFile{
+		gcloud.GKESecretFile{
+			Filename: "dev_db_connection_name.txt",
+			Content:  ist.ConnectionName,
 		},
-		gkeSecretFile{
-			filename: "dev_daily_price_url.txt",
-			content:  "http://" + clusterIP,
+		gcloud.GKESecretFile{
+			Filename: "dev_daily_price_url.txt",
+			Content:  "http://" + clusterIP,
+		},
+		gcloud.GKESecretFile{
+			Filename: "dev_growthtrend_targetdate.txt",
+			Content:  targetDate,
 		},
 	}
 
 	// test用Secretファイルを配置
-	if err := gkeSetFilesForDevEnv("./k8s/overlays/dev/", secretFiles); err != nil {
-		return fmt.Errorf("failed to gkeSetFilesForDevEnv: %#v", err)
+	if err := gcloud.GKESetFilesForDevEnv("./k8s/overlays/dev/", secretFiles); err != nil {
+		return fmt.Errorf("failed to GKESetFilesForDevEnv: %#v", err)
 	}
 
-	if err := gkeDeploy("./k8s/overlays/dev/"); err != nil {
+	if err := gcloud.GKEDeploy("./k8s/overlays/dev/"); err != nil {
 		return fmt.Errorf("failed to deploy: %#v", err)
 	}
 	return nil
@@ -223,28 +241,29 @@ func nikkeiMockClusterIP() (string, error) {
 	return res.Stdout, nil
 }
 
-func startCloudSQLProxy(instance cloudSQLInstance) error {
-	ist, err := instance.listInstance()
+func startCloudSQLProxy(instance gcloud.CloudSQLInstance) error {
+	ist, err := instance.ListInstance()
 	if err != nil {
-		return fmt.Errorf("failed to listInstance: %#v", err)
+		return fmt.Errorf("failed to ListInstance: %#v", err)
 	}
 	// コマンドの実行を待たないのでチャネルは捨てる
 	// TODO: CommandContextや、Process.Killなどを使ってあとから止められるようにする
 	// https://golang.org/pkg/os/exec/#CommandContext
 	// https://golang.org/pkg/os/#Process.Kill
+	//_, err = command.Exec(fmt.Sprintf("./cloud_sql_proxy -instances=%s=tcp:3307", ist.ConnectionName))
 	_, err = command.Exec(fmt.Sprintf("./cloud_sql_proxy -instances=%s=tcp:3307", ist.ConnectionName))
 	if err != nil {
-		fmt.Errorf("failed to start cloud_sql_proxy: %v", err)
+		return fmt.Errorf("failed to start cloud_sql_proxy: %v", err)
 	}
 	time.Sleep(3 * time.Second) // cloud_sql_proxyを立ち上げてから接続できるまで若干時差がある
 	log.Println("start cloud_sql_proxy successfully")
 	return nil
 }
 
-func checkTestDataInDBSheet(ctx context.Context) error {
+func checkTestDataInDB(ctx context.Context) error {
 	var db database.DB
 	// DBにつながるまでretryする
-	if err := WithContext(ctx, 20, 3*time.Second, func() error {
+	if err := retry.WithContext(ctx, 20, 3*time.Second, func() error {
 		var e error
 		db, e = database.NewDB(fmt.Sprintf("%s/%s",
 			getDSN("root", "", "127.0.0.1:3307"),
@@ -257,20 +276,21 @@ func checkTestDataInDBSheet(ctx context.Context) error {
 		return fmt.Errorf("failed to NewDB: %w", err)
 	}
 
-	if err := WithContext(ctx, 20, 5*time.Second, func() error {
-		ret, err := db.SelectDB("SHOW DATABASES")
-		if err != nil {
-			return fmt.Errorf("failed to SelectDB: %v", err)
-		}
-		log.Println("SHOW DATABASES:", ret)
+	ret, err := db.SelectDB("SHOW DATABASES")
+	if err != nil {
+		return fmt.Errorf("failed to SelectDB: %v", err)
+	}
+	log.Println("SHOW DATABASES:", ret)
+	if err := retry.WithContext(ctx, 20, 10*time.Second, func() error {
 		// tableに格納されたcodeの数を確認
 		retCodes, err := db.SelectDB("SELECT DISTINCT code FROM daily")
 		if err != nil {
 			return fmt.Errorf("failed to SelectDB: %v", err)
 		}
-		testcodes := []string{"1802", "2587", "3382", "4684", "5105", "6506", "6758", "7201", "8058", "9432"}
-		if len(retCodes) != len(testcodes) {
-			return fmt.Errorf("got codes: %d, want: %d", len(retCodes), len(testcodes))
+		log.Println("SELECT DISTINCT code FROM daily:", retCodes)
+		wantCodes := []string{"1802", "2587", "3382", "4684", "5105", "6506", "6758", "7201", "8058", "9432"}
+		if len(retCodes) != len(wantCodes) {
+			return fmt.Errorf("got codes: %d, want: %d", len(retCodes), len(wantCodes))
 		}
 		return nil
 	}); err != nil {
@@ -279,21 +299,39 @@ func checkTestDataInDBSheet(ctx context.Context) error {
 	return nil
 }
 
-// 	// // spreadsheetのserviceを取得
-// 	// sheetCredential := mustGetenv("SHEET_CREDENTIAL")
-// 	// srv, err := sheet.GetSheetClient(ctx, sheetCredential)
-// 	// if err != nil {
-// 	// 	return fmt.Errorf("failed to get sheet service. err: %v", err)
-// 	// }
-// 	// log.Println("got sheet service successfully")
-
-// 	return nil
-// }
-
-func getDSN(usr, pwd, host string) string {
-	cred := strings.TrimRight(usr, "\n")
-	if pwd != "" {
-		cred = cred + ":" + strings.TrimRight(pwd, "\n")
+func checkTestDataInSheet(ctx context.Context) error {
+	// spreadsheetのserviceを取得
+	sheetCredential := mustGetenv("SHEET_CREDENTIAL")
+	srv, err := sheet.GetSheetClient(ctx, sheetCredential)
+	if err != nil {
+		return fmt.Errorf("failed to get sheet service. err: %v", err)
 	}
-	return fmt.Sprintf("%s@tcp(%s)", cred, strings.TrimRight(host, "\n"))
+	log.Println("got sheet service successfully")
+
+	if err := retry.WithContext(ctx, 20, 3*time.Second, func() error {
+		ts := sheet.NewSpreadSheet(srv, mustGetenv("INTEGRATION_TEST_SHEETID"), "trend")
+		got, err := ts.Read()
+		if err != nil {
+			return fmt.Errorf("failed to read sheet: %w", err)
+		}
+		//fmt.Println("got:", got)
+		var gotCodes []string
+		for i, l := range got {
+			if i == 0 {
+				continue
+			}
+			if len(l) > 0 {
+				gotCodes = append(gotCodes, l[0])
+			}
+		}
+		wantCodes := []string{"1802", "2587", "3382", "4684", "5105", "6506", "6758", "7201", "8058", "9432"}
+		sort.Slice(gotCodes, func(i, j int) bool { return gotCodes[i] < gotCodes[j] })
+		if !reflect.DeepEqual(gotCodes, wantCodes) {
+			return fmt.Errorf("gotCodes: %v, wantCodes: %v", gotCodes, wantCodes)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to check sheet: %w", err)
+	}
+	return nil
 }

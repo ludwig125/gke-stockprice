@@ -101,38 +101,66 @@ jobs:
     docker:
       - image: google/cloud-sdk
     working_directory: /go/src/github.com/ludwig125/gke-stockprice
-    #parallelism: 2 # testの並列実行
     environment:
       TZ: Asia/Tokyo # timezoneが合っていないとtestが失敗する
+      GO_VERSION: 1.14.1
+      PROJECT_NAME: gke-stockprice
     steps:
       - checkout
-      # - restore_cache: # 前回の実行以降の変更が検出されなかった場合、保存されているキャッシュを復元
-      #     keys:
-      #       - go-mod-v4-{{ checksum "go.sum" }}
-      # - run:
-      #   # Our primary container isn't MYSQL so run a sleep command until it's ready.
-      #     name: Waiting for MySQL to be ready
-      #     command: |
-      #       for i in `seq 1 30`;
-      #       do
-      #         nc -z 127.0.0.1 3306 && echo Success && exit 0
-      #         echo -n .
-      #         sleep 1
-      #       done
-      #       echo Failed waiting for MySQL && exit 1
       - run:
-          name: integration-test
-          #command: go test -v slack.go slack_test.go
-          #command: go test -v database/database*
+          name: Install wget
           command: |
-            echo $GCLOUD_SERVICE_KEY | base64 -di > serviceaccount.json
-            SHEET_CREDENTIAL=serviceaccount.json go test -v ./...
-      # - save_cache:
-      #     key: go-mod-v4-{{ checksum "go.sum" }}
-      #     paths:
-      #       # go modで取得したバイナリなどは$GOPATH/pkg/mod/以下にキャッシュされる
-      #       - "/go/pkg/mod"
-
+            apt-get install -y wget
+      - run:
+          name: Install go
+          command: |
+            wget https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz
+            tar -C /usr/local -xzf go$GO_VERSION.linux-amd64.tar.gz
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
+            source $BASH_ENV
+            go version
+      - run:
+          name: Install cloud_sql_proxy
+          command: |
+            wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+            chmod +x cloud_sql_proxy
+            ls -l ./cloud_sql_proxy
+      - run:
+          name: Install kustomize
+          # ref. https://github.com/kubernetes-sigs/kustomize/blob/master/docs/INSTALL.md#quickly-curl-the-latest-binary
+          command: |
+            curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+            ./kustomize version
+      - run:
+          name: Activate Service Account
+          command: |
+            echo $GCLOUD_SERVICE_KEY | base64 -di > gke-stockprice-serviceaccount.json
+            gcloud auth activate-service-account --key-file gke-stockprice-serviceaccount.json
+            gcloud config set project $PROJECT_NAME
+      - run:
+          name: Set files
+          command: |
+            echo $GCLOUD_SERVICE_KEY | base64 -di > ./k8s/base/gke-stockprice-serviceaccount.json # integration_test内でkustomize buildするため
+            echo -n $DEV_DB_USERNAME > k8s/overlays/dev/db_username.txt
+            echo -n $DEV_DB_PASSWORD > k8s/overlays/dev/db_password.txt
+            echo -n $INTEGRATION_TEST_SHEETID > k8s/overlays/dev/dev_sheetid.txt
+      - run:
+          name: Integration-test
+          command: |
+            SHEET_CREDENTIAL=gke-stockprice-serviceaccount.json INTEGRATION_TEST_SHEETID=$INTEGRATION_TEST_SHEETID go test -v ./... -tags integration
+      # - run:
+      #     name: integration-test
+      #     command: |
+      #       apt-get install -y wget
+      #       wget https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz
+      #       tar -C /usr/local -xzf go$GO_VERSION.linux-amd64.tar.gz
+      #       echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
+      #       source $BASH_ENV
+      #       go version
+      #       echo $GCLOUD_SERVICE_KEY | base64 -di > gke-stockprice-serviceaccount.json
+      #       gcloud auth activate-service-account --key-file gke-stockprice-serviceaccount.json
+      #       gcloud config set project $PROJECT_NAME
+      #       SHEET_CREDENTIAL=gke-stockprice-serviceaccount.json INTEGRATION_TEST_SHEETID=$INTEGRATION_TEST_SHEETID go test -v ./... -tags integration
     
   # deploy:
   #   environment:
@@ -295,7 +323,6 @@ workflows:
   version: 2
   master-build:
     jobs:
-      # - build
       - test
       - build:
           requires:
@@ -307,6 +334,9 @@ workflows:
       # - deploy:
       #     requires:
       #       - build
+      - integration-test:
+          requires:
+           - build
   # cronで定期実行させたい場合は以下を有効にする
   # create-deploy:
   #   triggers:

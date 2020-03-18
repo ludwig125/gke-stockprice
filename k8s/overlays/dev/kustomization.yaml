@@ -30,12 +30,18 @@ configMapGenerator:
   behavior: create
   files:
   - daily_price_url=dev_daily_price_url.txt # integration_test内で動的に生成される
+- name: growthtrend-config
+  behavior: create
+  files:
+  - growthtrend_targetdate=dev_growthtrend_targetdate.txt # integration_test内で動的に生成される
+
 
 
 secretGenerator:
 - name: db-config
   behavior: create
   files:
+  # いまintegration testではpassword設定されていない！
   - db_username=db_username.txt # integration_test前に配置しておく(echo -n "value" > fileの形で)
   - db_password=db_password.txt # integration_test前に配置しておく
 - name: sheetids
@@ -43,3 +49,4 @@ secretGenerator:
   files:
   - holiday_sheetid=dev_sheetid.txt # integration_test前に配置しておく
   - companycode_sheetid=dev_sheetid.txt # integration_test前に配置しておく
+  - trend_sheetid=dev_sheetid.txt # integration_test前に配置しておく
