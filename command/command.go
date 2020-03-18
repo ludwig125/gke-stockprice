@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"os/exec"
 	"strings"
 )
@@ -17,9 +18,9 @@ type Result struct {
 
 // Exec execute external command without waiting.
 func Exec(c string) (chan Result, error) {
-	fmt.Println("----command----")
-	fmt.Println(c)
-	fmt.Println("--------------")
+	log.Println("----command----")
+	log.Println(c)
+	log.Println("--------------")
 	cmd := exec.Command("bash", "-c", c)
 
 	cmdResCh := make(chan Result)
@@ -43,13 +44,12 @@ func Exec(c string) (chan Result, error) {
 		defer close(cmdResCh)
 
 		// scanで結果を画面に出力すると同時にレスポンス用に格納する
-		fmt.Println("----stdout----")
+		log.Println("----stdout----")
 		cmdStdout := scan(stdout)
-		//cmdStdout := read(stdout)
-		fmt.Println("--------------")
-		fmt.Println("----stderr----")
+		log.Println("--------------")
+		log.Println("----stderr----")
 		cmdStderr := scan(stderr)
-		fmt.Println("--------------")
+		log.Println("--------------")
 
 		var cmdErr error
 		if err := cmd.Wait(); err != nil {
@@ -70,7 +70,7 @@ func scan(s io.ReadCloser) string {
 	scanner := bufio.NewScanner(s)
 	for scanner.Scan() {
 		l := scanner.Text()
-		fmt.Printf("%#v\n", l)
+		log.Printf("%#v\n", l)
 		res += fmt.Sprintf("%s\n", l) // Textは改行を削除してしまうので改行を付与
 	}
 	return strings.TrimRight(res, "\n") // 末尾の改行だけ削る

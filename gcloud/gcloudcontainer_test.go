@@ -1,6 +1,6 @@
 // +build integration
 
-package main
+package gcloud
 
 import (
 	"reflect"
@@ -10,13 +10,13 @@ import (
 func TestListCluster(t *testing.T) {
 	cases := []struct {
 		name       string
-		cluster    gkeCluster
+		cluster    GKECluster
 		wantStdout string
 		wantErr    string
 	}{
 		{
 			name: "match_projectid",
-			cluster: gkeCluster{
+			cluster: GKECluster{
 				Project:     "gke-stockprice",
 				ClusterName: "gke-stockprice-integration-test",
 				ComputeZone: "us-west1-c",
@@ -27,7 +27,7 @@ func TestListCluster(t *testing.T) {
 		},
 		// {
 		// 	name: "not_match_projectid",
-		// 	instance: cloudSQLInstance{
+		// 	instance: CloudSQLInstance{
 		// 		Project:  "gke-stockprice-test",
 		// 		Instance: "gke-stockprice-integration2-test",
 		// 		Tier:     "db-f1-micro",
@@ -40,7 +40,7 @@ func TestListCluster(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			c := tt.cluster
-			if _, err := c.listCluster(); err != nil {
+			if _, err := c.ListCluster(); err != nil {
 				if err.Error() != tt.wantErr {
 					t.Fatalf("got error: %v want error: %s", err, tt.wantErr)
 				}
@@ -53,14 +53,14 @@ func TestFormatListedCluster(t *testing.T) {
 	cases := []struct {
 		name    string
 		listed  string
-		want    gkeClusterListed
+		want    GKEClusterListed
 		wantErr string
 	}{
 		{
 			name: "match_format",
 			listed: `NAME                             LOCATION    MASTER_VERSION  MASTER_IP       MACHINE_TYPE  NODE_VERSION    NUM_NODES  STATUS
 			gke-stockprice-integration-test  us-west1-c  1.13.11-gke.14  35.230.100.164  g1-small      1.13.11-gke.14  2          RUNNING`,
-			want: gkeClusterListed{
+			want: GKEClusterListed{
 				Name:          "gke-stockprice-integration-test",
 				Location:      "us-west1-c",
 				MasterVersion: "1.13.11-gke.14",
