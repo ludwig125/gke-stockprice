@@ -84,6 +84,11 @@ func TestExec(t *testing.T) {
 }
 
 func TestExecAndWait(t *testing.T) {
+	//　ログの出力先を/dev/nullにして捨てる
+	log.SetOutput(ioutil.Discard)
+	//　終わったらログ出力先を標準出力に戻す
+	defer log.SetOutput(os.Stdout)
+
 	cases := []struct {
 		name         string
 		cmd          string

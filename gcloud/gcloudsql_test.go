@@ -62,7 +62,7 @@ func TestCreateDeleteInstance(t *testing.T) {
 	}
 }
 
-func TestListInstance(t *testing.T) {
+func TestDescribeInstance(t *testing.T) {
 	cases := []struct {
 		name       string
 		instance   CloudSQLInstance
@@ -96,11 +96,11 @@ func TestListInstance(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			i := tt.instance
-			// if _, err := i.ListInstance(); (err != nil) != tt.wantErr {
+			// if _, err := i.DescribeInstance(); (err != nil) != tt.wantErr {
 			// 	t.Errorf("error: %v, wantErr: %v", err, tt.wantErr)
 			// 	return
 			// }
-			res, err := i.ListInstance()
+			res, err := i.DescribeInstance()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error: %v, wantErr: %v", err, tt.wantErr)
 				return

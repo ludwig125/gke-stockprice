@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -82,10 +83,8 @@ func TestStockPrice(t *testing.T) {
 				fetchInterval:      10 * time.Millisecond,
 				fetchTimeout:       1 * time.Second,
 				currentTime:        time.Date(2019, 12, 1, 0, 0, 0, 0, time.Local),
-				//maxInsertDBNum:     3,
 			}
 
-			//testcodes := []string{"1802", "2587", "3382", "4684", "5105", "6506", "6758", "7201", "8058", "9432"}
 			failedCodes, err := sp.saveStockPrice(ctx, tc.codes)
 			if err != nil {
 				t.Fatalf("error: %v", err)
@@ -100,7 +99,7 @@ func TestStockPrice(t *testing.T) {
 					t.Log(f.Error())
 					fcodes = append(fcodes, f.code)
 				}
-				//sort.Slice(fcodes, func(i, j int) bool { return fcodes[i].code < fcodes[j].code })
+				sort.Slice(fcodes, func(i, j int) bool { return fcodes[i] < fcodes[j] })
 				if !reflect.DeepEqual(fcodes, tc.wantFailedCodes) {
 					t.Fatalf("got failedCodes: %#v, want failedCodes: %v", fcodes, tc.wantFailedCodes)
 				}

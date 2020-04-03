@@ -1,3 +1,12 @@
 gke-stockprice-serviceaccount.json
 slack_token.txt
+slack_channel.txt
 resource.yaml
+circleci_token.txt
+daily_price_url.txt
+db_username.txt
+db_password.txt
+sheetid.txt
+db_connection_name.txt
+growthtrend_targetdate.txt
+dev_sheetid.txt

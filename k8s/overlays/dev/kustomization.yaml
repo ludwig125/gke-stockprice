@@ -25,25 +25,25 @@ configMapGenerator:
   # literals:
   # - db_connection_name=gke-stockprice:us-central1:gke-stockprice-integration-test-202001100551
   files:
-  - db_connection_name=dev_db_connection_name.txt # integration_test内で動的に生成される
+  - db_connection_name=db_connection_name.txt # integration_test内で動的に生成される
 - name: daily-config
   behavior: create
   files:
-  - daily_price_url=dev_daily_price_url.txt # integration_test内で動的に生成される
+  - daily_price_url=daily_price_url.txt # integration_test内で動的に生成される
 - name: growthtrend-config
   behavior: create
   files:
-  - growthtrend_targetdate=dev_growthtrend_targetdate.txt # integration_test内で動的に生成される
+  - growthtrend_targetdate=growthtrend_targetdate.txt # integration_test内で動的に生成される
 
 
 
 secretGenerator:
-- name: db-config
-  behavior: create
-  files:
-  # いまintegration testではpassword設定されていない！
-  - db_username=db_username.txt # integration_test前に配置しておく(echo -n "value" > fileの形で)
-  - db_password=db_password.txt # integration_test前に配置しておく
+# - name: db-config
+#   behavior: replace
+#   files:
+#   # いまintegration testではpassword設定されていない！
+#   - db_username=db_username.txt # integration_test前に配置しておく(echo -n "value" > fileの形で)
+#   - db_password=db_password.txt # integration_test前に配置しておく
 - name: sheetids
   behavior: create
   files:

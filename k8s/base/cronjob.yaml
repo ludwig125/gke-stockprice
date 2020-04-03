@@ -67,6 +67,11 @@ spec:
                 configMapKeyRef:
                   name: debug-config
                   key: debug
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: environment
             - name: DB_CONNECTION_NAME
               valueFrom:
                 configMapKeyRef:
@@ -107,11 +112,36 @@ spec:
                 secretKeyRef:
                   name: sheetids
                   key: trend_sheetid
+            - name: SLACK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: slack-config
+                  key: slack_token
+            - name: SLACK_CHANNEL
+              valueFrom:
+                secretKeyRef:
+                  name: slack-config
+                  key: slack_channel
+            - name: CIRCLE_API_USER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: circleci-api-config
+                  key: circleci_token
             - name: GROWTHTREND_TARGETDATE
               valueFrom:
                 configMapKeyRef:
                   name: growthtrend-config
                   key: growthtrend_targetdate
+            - name: DELETE_GKE_CLUSTER
+              valueFrom:
+                configMapKeyRef:
+                  name: delete-gke-cluster
+                  key: flag
+            - name: SEND_SLACK_MESSAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: send-slack
+                  key: flag
             volumeMounts:
               - name: serviceaccount-volume
                 mountPath: credential

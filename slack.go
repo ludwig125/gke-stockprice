@@ -8,28 +8,28 @@ import (
 	"github.com/nlopes/slack"
 )
 
-func createAndSendMsgToSlack(token, channel, service, result, emoji string, start, finish time.Time) error {
-	sl := NewSlack(token, channel)
-	msg := createSlackMsg(service, start, finish, result)
-	if err := sl.SendMessage(service, msg, emoji); err != nil {
-		return fmt.Errorf("failed to SendMessage: %w", err)
-	}
-	return nil
-}
+// func createAndSendMsgToSlack(token, channel, service, result, emoji string, start, finish time.Time) error {
+// 	sl := NewSlackClient(token, channel)
+// 	msg := createSlackMsg(service, start, finish, result)
+// 	if err := sl.SendMessage(service, msg, emoji); err != nil {
+// 		return fmt.Errorf("failed to SendMessage: %w", err)
+// 	}
+// 	return nil
+// }
 
-// Slack is interface
+// Slack is interface.
 type Slack interface {
 	SendMessage(string, string, string) error
 }
 
-// SlackClient is struct to send slack API
+// SlackClient is struct to send slack API.
 type SlackClient struct {
 	client  *slack.Client
 	channel string
 }
 
-// NewSlack create new slack
-func NewSlack(token, channel string) Slack {
+// NewSlackClient create new slack client.
+func NewSlackClient(token, channel string) Slack {
 	cl := slack.New(token)
 	return SlackClient{cl, channel}
 }
@@ -50,7 +50,7 @@ func createSlackMsg(service string, start, finish time.Time, msgContents string)
 	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
 	processingTime := finish.Sub(start).Truncate(time.Second)
 
-	msg := fmt.Sprintf("*%s が正常に終了しました。*\n", service)
+	msg := fmt.Sprintf("*%s が終了しました。*\n", service)
 	msg += fmt.Sprintf("起動時刻: %v\n", start.In(jst).Format("2006-01-02 15:04:05"))
 	msg += fmt.Sprintf("終了時刻: %v\n", finish.In(jst).Format("2006-01-02 15:04:05"))
 	msg += fmt.Sprintf("所要時間: %v\n\n", processingTime)
