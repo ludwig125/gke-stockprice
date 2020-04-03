@@ -12,6 +12,10 @@ import (
 )
 
 func TestSaveMovingAvg(t *testing.T) {
+	// //　ログの出力先を/dev/nullにして捨てる
+	// log.SetOutput(ioutil.Discard)
+	// //　終わったらログ出力先を標準出力に戻す
+	// defer log.SetOutput(os.Stdout)
 	cleanup, err := database.SetupTestDB(3306)
 	if err != nil {
 		t.Fatalf("failed to SetupTestDB: %v", err)

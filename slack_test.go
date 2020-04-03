@@ -8,7 +8,7 @@ import (
 func TestSlack(t *testing.T) {
 	// token := mustGetenv("SLACK_TOKEN")
 	// channel := mustGetenv("SLACK_CHANNEL")
-	// sl := NewSlack(token, channel)
+	// sl := NewSlackClient(token, channel)
 	// sl.SendMessage("slack-test2", "test-message", ":sunny:")
 }
 
@@ -28,7 +28,7 @@ func TestCreateSlackMsg(t *testing.T) {
 	finish := time.Date(2019, 2, 1, 1, 23, 45, 67, time.Local)
 	cont := `これはテストメッセージ\nslackのテスト\nです`
 
-	want := `*slack-test が正常に終了しました。*
+	want := `*slack-test が終了しました。*
 起動時刻: 2019-02-01 00:00:00
 終了時刻: 2019-02-01 01:23:45
 所要時間: 1h23m45s

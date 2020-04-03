@@ -70,8 +70,8 @@ func (i CloudSQLInstance) DeleteInstance() error {
 
 // このAPIはサービスアカウントでは使えない
 // 以下のエラーが出る
-// failed to ListInstance: &errors.errorString{s:"failed to get google.DefaultClient: google: could not find default credentials. See https://developers.google.com/accounts/docs/application-default-credentials for more information."}
-// func (i CloudSQLInstance) ListInstance() (*sqladmin.DatabaseInstance, error) {
+// failed to DescribeInstance: &errors.errorString{s:"failed to get google.DefaultClient: google: could not find default credentials. See https://developers.google.com/accounts/docs/application-default-credentials for more information."}
+// func (i CloudSQLInstance) DescribeInstance() (*sqladmin.DatabaseInstance, error) {
 // 	// 参考
 // 	// list API: https://cloud.google.com/sql/docs/mysql/admin-api/v1beta4/operations/list?hl=ja
 // 	// 取れる情報: https://cloud.google.com/sql/docs/mysql/admin-api/rest/v1beta4/instances#DatabaseInstance
@@ -160,7 +160,7 @@ func (c *column) find(line, target string) {
 	}
 }
 
-func (i CloudSQLInstance) ListInstance() (*CloudSQLDatabaseInstance, error) {
+func (i CloudSQLInstance) DescribeInstance() (*CloudSQLDatabaseInstance, error) {
 	if !strings.Contains(i.Instance, "integration-test") {
 		return nil, fmt.Errorf("instance name should contains 'integration-test'. instance: %s", i.Instance)
 	}
@@ -230,9 +230,9 @@ func (i CloudSQLInstance) ExistCloudSQLInstance() (bool, error) {
 
 func (i CloudSQLInstance) ConfirmCloudSQLInstanceStatus(wantStatus string) error {
 	if err := retry.Retry(30, 20*time.Second, func() error {
-		instance, err := i.ListInstance()
+		instance, err := i.DescribeInstance()
 		if err != nil {
-			return fmt.Errorf("failed to ListInstance: %w", err)
+			return fmt.Errorf("failed to DescribeInstance: %w", err)
 		}
 		if instance.State != wantStatus {
 			return fmt.Errorf("not matched. current: %s, expected: %s", instance.State, wantStatus)

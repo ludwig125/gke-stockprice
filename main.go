@@ -33,12 +33,12 @@ func getLocation() *time.Location {
 }
 
 func main() {
-	log.Println("start")
-	if os.Getenv("ENABLE_GKE_CLUSTER_DELETE") == "on" {
+	start := time.Now()
+	log.Println("start:", start)
+	if os.Getenv("DELETE_GKE_CLUSTER") == "on" {
 		ciToken := mustGetenv("CIRCLE_API_USER_TOKEN")
 		defer func() {
-			err := requestCircleci(ciToken, "delete_gke_cluster")
-			if err != nil {
+			if err := requestCircleci(ciToken, "delete_gke_cluster"); err != nil {
 				log.Printf("failed to requestCircleci: %v", err)
 			}
 			log.Println("requestCircleci successfully", ciToken)
@@ -63,13 +63,24 @@ func main() {
 		}
 	}()
 
+	result := "finished successfully"
+	emoji := ":sunny:"
 	// 日時バッチ処理
 	if err := execDailyProcess(ctx); err != nil {
 		log.Println("failed to execDailyProcess:", err)
+		result = err.Error()
+		emoji = ":umbrella:"
 		cancel() // 何らかのエラーが発生した場合、他の処理も全てcancelさせる
-		return
 	}
 
+	finish := time.Now()
+	if os.Getenv("SEND_SLACK_MESSAGE") == "on" {
+		msg := createSlackMsg("gke-stockprice", start, finish, result)
+		sl := NewSlackClient(mustGetenv("SLACK_TOKEN"), mustGetenv("SLACK_CHANNEL"))
+		if err := sl.SendMessage("gke-stockprice", msg, emoji); err != nil {
+			log.Printf("failed to SendMessage: %v", err)
+		}
+	}
 	// // TODO: あとで以下消す
 	// for i := 0; i < 2000; i++ {
 	// 	select {
@@ -102,21 +113,23 @@ func execDailyProcess(ctx context.Context) error {
 	}
 	log.Println("got sheet service successfully")
 
-	holidaySheet := sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday")
-	isHoli, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
-	if err != nil {
-		// sheetからデータが取れないだけであればエラー出して処理自体は続ける
-		log.Printf("failed to isHoliday: %v", err)
-	}
-	// 前の日が祝日だったら起動しないで終わる
-	if err == nil && isHoli {
-		log.Println("previous day is holiday. finish task")
-		return nil
-	}
-	// 前の日が土日だったら起動しないで終わる
-	if isSaturdayOrSunday(time.Now().In(jst).AddDate(0, 0, -1)) {
-		log.Println("previous day is saturday or sunday. finish task")
-		return nil
+	if env == "prod" {
+		holidaySheet := sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday")
+		isHoli, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
+		if err != nil {
+			// sheetからデータが取れないだけであればエラー出して処理自体は続ける
+			log.Printf("failed to isHoliday: %v", err)
+		}
+		// 前の日が祝日だったら起動しないで終わる
+		if err == nil && isHoli {
+			log.Println("previous day is holiday. finish task")
+			return nil
+		}
+		// 前の日が土日だったら起動しないで終わる
+		if isSaturdayOrSunday(time.Now().In(jst).AddDate(0, 0, -1)) {
+			log.Println("previous day is saturday or sunday. finish task")
+			return nil
+		}
 	}
 
 	// 銘柄一覧の取得
@@ -178,6 +191,7 @@ func useEnvOrDefault(key, def string) string {
 	if fromEnv := os.Getenv(key); fromEnv != "" {
 		v = fromEnv
 	}
+	log.Printf("%s environment variable set", key)
 	return v
 }
 
@@ -225,11 +239,8 @@ func getDatabase(ctx context.Context) (database.DB, error) {
 		if err := retry.WithContext(ctx, 120, 10*time.Second, func() error {
 			var e error
 			db, e = database.NewDB(fmt.Sprintf("%s/%s",
-				getDSN(mustGetenv("DB_USER"),
-					"",
-					"127.0.0.1:3306"),
+				getDSN("root", "", "127.0.0.1:3306"),
 				"stockprice_dev"))
-
 			return e
 		}); err != nil {
 			return nil, fmt.Errorf("failed to NewDB: %w", err)

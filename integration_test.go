@@ -36,8 +36,8 @@ func TestGKEStockPrice(t *testing.T) {
 
 	instance := gcloud.CloudSQLInstance{
 		Project: "gke-stockprice",
-		//Instance: "gke-stockprice-integration-test-202003240621",
-		Instance:     "gke-stockprice-integration-test-" + time.Now().Format("200601021504"),
+		//Instance: "gke-stockprice-cloudsql-integration-test-202003240621",
+		Instance:     "gke-stockprice-cloudsql-integration-test-" + time.Now().Format("200601021504"),
 		Tier:         "db-f1-micro",
 		Region:       "us-central1",
 		DatabaseName: "stockprice_dev",
@@ -47,7 +47,7 @@ func TestGKEStockPrice(t *testing.T) {
 	// test用GKEクラスタ
 	cluster := gcloud.GKECluster{
 		Project:     "gke-stockprice",
-		ClusterName: "gke-stockprice-integration-test",
+		ClusterName: "gke-stockprice-cluster-integration-test",
 		ComputeZone: "us-central1-a",
 		MachineType: "g1-small",
 		ExecCmd:     true, // 実際に作成削除を行う
@@ -132,19 +132,18 @@ func TestGKEStockPrice(t *testing.T) {
 
 func setupSQLInstance(instance gcloud.CloudSQLInstance) error {
 	// すでにSQLInstanceが存在するかどうか確認
-	ist, err := instance.ListInstance()
+	ok, err := instance.ExistCloudSQLInstance()
 	if err != nil {
-		return fmt.Errorf("failed to ListInstance: %#v", err)
+		return fmt.Errorf("failed to ExistCloudSQLInstance: %#v", err)
 	}
-	//fmt.Println(ist) // TODO
-
-	// SQLInstanceがないなら作る
-	if ist == nil {
+	if !ok {
+		// SQLInstanceがないなら作る
 		log.Println("SQL Instance does not exists. trying to create...")
 		if err := instance.CreateInstance(); err != nil {
 			return fmt.Errorf("failed to CreateInstance: %#v", err)
 		}
 	}
+
 	// RUNNABLEかどうか確認する
 	if err := instance.ConfirmCloudSQLInstanceStatus("RUNNABLE"); err != nil {
 		return fmt.Errorf("failed to ConfirmCloudSQLInstanceStatus: %w", err)
@@ -159,7 +158,7 @@ func setupGKECluster(cluster gcloud.GKECluster) error {
 	if err != nil {
 		return fmt.Errorf("failed to ListCluster: %w", err)
 	}
-	//fmt.Println(clList)
+
 	// GKEクラスタがないときは作成する
 	if clList == nil {
 		log.Println("GKE cluster does not exists. trying to create...")
@@ -189,9 +188,9 @@ func deployGKENikkeiMock() error {
 func deployGKEStockprice(instance gcloud.CloudSQLInstance) error {
 	fmt.Printf("instance: \n    %#v\n", instance)
 
-	ist, err := instance.ListInstance()
+	ist, err := instance.DescribeInstance()
 	if err != nil {
-		return fmt.Errorf("failed to ListInstance: %v", err)
+		return fmt.Errorf("failed to DescribeInstance: %v", err)
 	}
 
 	clusterIP, err := nikkeiMockClusterIP()
@@ -209,15 +208,15 @@ func deployGKEStockprice(instance gcloud.CloudSQLInstance) error {
 	// Secretを環境変数として読み込むためにファイルを配置する
 	secretFiles := []gcloud.GKESecretFile{
 		gcloud.GKESecretFile{
-			Filename: "dev_db_connection_name.txt",
+			Filename: "db_connection_name.txt",
 			Content:  ist.ConnectionName,
 		},
 		gcloud.GKESecretFile{
-			Filename: "dev_daily_price_url.txt",
+			Filename: "daily_price_url.txt",
 			Content:  "http://" + clusterIP,
 		},
 		gcloud.GKESecretFile{
-			Filename: "dev_growthtrend_targetdate.txt",
+			Filename: "growthtrend_targetdate.txt",
 			Content:  targetDate,
 		},
 	}
@@ -242,9 +241,9 @@ func nikkeiMockClusterIP() (string, error) {
 }
 
 func startCloudSQLProxy(instance gcloud.CloudSQLInstance) error {
-	ist, err := instance.ListInstance()
+	ist, err := instance.DescribeInstance()
 	if err != nil {
-		return fmt.Errorf("failed to ListInstance: %#v", err)
+		return fmt.Errorf("failed to DescribeInstance: %#v", err)
 	}
 	// コマンドの実行を待たないのでチャネルは捨てる
 	// TODO: CommandContextや、Process.Killなどを使ってあとから止められるようにする

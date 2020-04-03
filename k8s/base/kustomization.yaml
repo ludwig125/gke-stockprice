@@ -19,17 +19,28 @@ configMapGenerator:
 - name: sheet-config
   literals:
   - sheet-credential-path=/credential/gke-stockprice-serviceaccount.json
+- name: env
+  literals:
+  - environment=dev
+- name: delete-gke-cluster
+  literals:
+  - flag=off
+- name: send-slack
+  literals:
+  - flag=off
 
 secretGenerator:
-# - name: db-config
-#   files:
-#   - db_username=db_username.txt
-# - name: kube-pass
-#   files:
-#   - password=password.txt
-# - name: kube-tradederby-sheetid
-#   files:
-#   - tradederby_sheetid=tradederby_sheetid.txt
 - name: kube-gke-stockprice-serviceaccount
   files:
   - gke-stockprice-serviceaccount.json
+- name: db-config
+  literals:
+  - db_username=override.me
+  - db_password=override.me
+- name: slack-config
+  literals:
+  - slack_token=override.me
+  - slack_channel=override.me
+- name: circleci-api-config
+  literals:
+  - circleci_token=override.me
