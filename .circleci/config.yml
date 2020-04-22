@@ -320,16 +320,16 @@ workflows:
            - build
 
   # cronで定期実行する
-  create-deploy:
-    triggers:
-      - schedule:
-          cron: "0 17 * * *" # 2:00 at JST
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - create_gke_cluster
-      - deploy_gke_stockprice:
-          requires:
-            - create_gke_cluster
+  # create-deploy:
+  #   triggers:
+  #     - schedule:
+  #         cron: "0 17 * * *" # 2:00 at JST
+  #         filters:
+  #           branches:
+  #             only:
+  #               - master
+  #   jobs:
+  #     - create_gke_cluster
+  #     - deploy_gke_stockprice:
+  #         requires:
+  #           - create_gke_cluster
