@@ -113,22 +113,23 @@ func execDailyProcess(ctx context.Context) error {
 	}
 	log.Println("got sheet service successfully")
 
-	if env == "prod" {
+	if env == "prod" && os.Getenv("CHECK_HOLIDAY") == "on"  {
 		holidaySheet := sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday")
 		isHoli, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
 		if err != nil {
 			// sheetからデータが取れないだけであればエラー出して処理自体は続ける
 			log.Printf("failed to isHoliday: %v", err)
-		}
-		// 前の日が祝日だったら起動しないで終わる
-		if err == nil && isHoli {
-			log.Println("previous day is holiday. finish task")
-			return nil
-		}
-		// 前の日が土日だったら起動しないで終わる
-		if isSaturdayOrSunday(time.Now().In(jst).AddDate(0, 0, -1)) {
-			log.Println("previous day is saturday or sunday. finish task")
-			return nil
+		} else {
+			// 前の日が祝日だったら起動しないで終わる
+			if err == nil && isHoli {
+				log.Println("previous day is holiday. finish task")
+				return nil
+			}
+			// 前の日が土日だったら起動しないで終わる
+			if isSaturdayOrSunday(time.Now().In(jst).AddDate(0, 0, -1)) {
+				log.Println("previous day is saturday or sunday. finish task")
+				return nil
+			}
 		}
 	}
 

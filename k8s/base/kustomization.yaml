@@ -28,6 +28,9 @@ configMapGenerator:
 - name: send-slack
   literals:
   - flag=off
+- name: check-holiday
+  literals:
+  - flag=off
 
 secretGenerator:
 - name: kube-gke-stockprice-serviceaccount
