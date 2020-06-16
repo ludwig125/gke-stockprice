@@ -1,4 +1,75 @@
-# CloudSQL
+# ローカルでの開発環境構築
+
+## gcloudインストール
+
+[Linux 用のクイックスタート  \|  Cloud SDK のドキュメント  |  Google Cloud](https://cloud.google.com/sdk/docs/quickstart-linux?hl=ja)
+
+## mysqlのインストール
+
+```bash
+$ sudo apt install mysql-server mysql-client
+
+$mysql --version
+mysql  Ver 14.14 Distrib 5.7.30, for Linux (x86_64) using  EditLine wrapper
+```
+
+起動に使用するmysqlユーザーのホームディレクトリが存在しないとmysql serverを立ち上げられないので/etc/passwdに以下を追加
+
+```bash
+$ sudo usermod -d /var/lib/mysql mysql
+```
+
+/etc/passwdに以下が追加されている
+
+```bash
+mysql:x:111:115:MySQL Server,,,:/var/lib/mysql:/bin/false
+```
+
+mysql server の起動
+
+```bash
+$ sudo service mysql start
+```
+
+ubuntu18.04でデフォルトのmysql5.7ではroot権限でないと接続できないらしい
+これだと個人開発環境では不便なので、sudoいらなくさせる
+
+```bash
+mysql > ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '';
+mysql > FLUSH PRIVILEGES;
+```
+
+これでsudoもpasswordも不要になる
+
+## go test
+
+mysqlが起動してればこれができる
+```
+$go test -v ./... -p 1 -count=1
+```
+go testはデフォルトではパラレルでテストを実行してしまうので、
+Mysqlのデータが競合しないように`-p 1`として並列数を１にしている
+
+## circleci cli
+
+cliのインストール(以下はWSL2 Ubuntu18.04でやった場合)
+
+- 参考：https://circleci.com/docs/2.0/local-cli/
+
+```
+$curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | s
+udo bash
+
+$which circleci
+/usr/local/bin/circleci
+```
+
+バリデーションチェック
+```
+$circleci config validate -c .circleci/config.yml
+```
+
+# 本番CloudSQL
 
 ## instanceの作成
 
@@ -15,7 +86,7 @@ passwordの設定
 
 ```bash
 $ gcloud sql users set-password root --host=% --instance=gke-stockprice-cloudsql-prod --prompt-for-password
-Instance Password:
+Instance Password: # ここに設定したいパスワードを入力
 Updating Cloud SQL user...done.
 ```
 
@@ -120,7 +191,7 @@ mysql> show tables;
 +----------------------+
 2 rows in set (0.13 sec)
 
-mysql> 
+mysql>
 ```
 
 # circleciのジョブをAPIから実行

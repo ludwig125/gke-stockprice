@@ -10,3 +10,5 @@ sheetid.txt
 db_connection_name.txt
 growthtrend_targetdate.txt
 dev_sheetid.txt
+google-cloud-sdk
+cloud_sql_proxy

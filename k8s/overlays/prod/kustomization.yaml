@@ -35,6 +35,10 @@ configMapGenerator:
   behavior: replace
   literals:
   - flag=on
+- name: check-holiday
+  behavior: replace
+  literals:
+  - flag=off
 
 secretGenerator:
 - name: db-config

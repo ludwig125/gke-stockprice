@@ -297,6 +297,33 @@ jobs:
           name: Check GKE Cluster
           command: gcloud container clusters list
 
+  list_gke_cluster:
+    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    environment:
+      PROJECT_NAME: gke-stockprice
+      CLUSTER_NAME: gke-stockprice-cluster-prod
+      COMPUTE_ZONE: us-central1-f
+      CRON_JOB: prod-gke-stockprice
+    docker:
+      - image: google/cloud-sdk # base64 -iオプションを使うのでalpineではない
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Set gcloud
+          command: |
+            echo $GCLOUD_SERVICE_KEY | base64 -di > ${HOME}/service_account.json
+            gcloud auth activate-service-account --key-file ${HOME}/service_account.json
+      - run:
+          name: Setup GKE Cluster Infomation
+          command: |
+            gcloud config set project $PROJECT_NAME
+            gcloud config set container/cluster $CLUSTER_NAME
+            gcloud config set compute/zone ${COMPUTE_ZONE}
+            gcloud container clusters get-credentials $CLUSTER_NAME
+      - run:
+          name: List GKE Cluster
+          command: gcloud container clusters list
 
 workflows:
   version: 2
@@ -320,16 +347,16 @@ workflows:
            - build
 
   # cronで定期実行する
-  # create-deploy:
-  #   triggers:
-  #     - schedule:
-  #         cron: "0 17 * * *" # 2:00 at JST
-  #         filters:
-  #           branches:
-  #             only:
-  #               - master
-  #   jobs:
-  #     - create_gke_cluster
-  #     - deploy_gke_stockprice:
-  #         requires:
-  #           - create_gke_cluster
+  create-deploy:
+    triggers:
+      - schedule:
+          cron: "0 18 * * *" # 3:00 at JST
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - create_gke_cluster
+      - deploy_gke_stockprice:
+          requires:
+            - create_gke_cluster
