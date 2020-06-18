@@ -132,6 +132,16 @@ spec:
                 configMapKeyRef:
                   name: growthtrend-config
                   key: growthtrend_targetdate
+            - name: CALC_MOVINGAVG_CONCURRENCY
+              valueFrom:
+                configMapKeyRef:
+                  name: moving-concurrency
+                  key: moving_concurrency
+            - name: CALC_GROWTHTREND_CONCURRENCY
+              valueFrom:
+                configMapKeyRef:
+                  name: growthtrend-concurrency
+                  key:  growthtrend_concurrency
             - name: DELETE_GKE_CLUSTER
               valueFrom:
                 configMapKeyRef:

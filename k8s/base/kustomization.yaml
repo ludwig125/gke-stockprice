@@ -31,6 +31,12 @@ configMapGenerator:
 - name: check-holiday
   literals:
   - flag=off
+- name: moving-concurrency
+  literals:
+  - concurrency=3
+- name: growthtrend-concurrency
+  literals:
+  - concurrency=3
 
 secretGenerator:
 - name: kube-gke-stockprice-serviceaccount
