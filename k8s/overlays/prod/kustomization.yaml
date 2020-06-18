@@ -39,6 +39,14 @@ configMapGenerator:
   behavior: replace
   literals:
   - flag=off
+- name: moving-concurrency
+  behavior: replace
+  literals:
+  - concurrency=1
+- name: growthtrend-concurrency
+  behavior: replace
+  literals:
+  - concurrency=1
 
 secretGenerator:
 - name: db-config
