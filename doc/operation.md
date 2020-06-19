@@ -4,6 +4,38 @@
 
 [Linux 用のクイックスタート  \|  Cloud SDK のドキュメント  |  Google Cloud](https://cloud.google.com/sdk/docs/quickstart-linux?hl=ja)
 
+インストール（自分がインストールしたときのバージョンの例）
+```
+$ curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-293.0.0-linux-x86_64.tar.gz
+```
+
+アーカイブをファイル システム上に展開
+
+- ホームディレクトリをおすすめしますと書いてあった
+- 自分がWSLを使っていた時は`/mnt/c/wsl`という、Cドライブ直下に`wsl` というディレクトリをホームディレクトリにしていたが、`gcloud components update`でpermission deniedが出るという問題が解決できなかったので `/home/$USER` 以下に展開した
+```
+$ tar zxvf google-cloud-sdk-293.0.0-linux-x86_64.tar.gz /home/$USER/google-cloud-sdk
+```
+
+インストール スクリプトを実行して、Cloud SDK ツールをパスに追加
+```
+$./google-cloud-sdk/install.sh
+
+Do you want to help improve the Google Cloud SDK (y/N)?  n
+
+```
+
+```
+$ gcloud init
+```
+
+-> URLが表示されたので、ブラウザでそのURLを開いて許可、コードが出てくるので、
+「Enter verification code:」にそれを入力した
+
+```
+gcloud config set accessibility/screen_reader true
+```
+
 ## mysqlのインストール
 
 ```bash
@@ -68,6 +100,24 @@ $which circleci
 ```
 $circleci config validate -c .circleci/config.yml
 ```
+
+## kustomize
+
+インストールとパス通す
+https://kubernetes-sigs.github.io/kustomize/installation/source/
+```
+$GOBIN=$(pwd)/ GO111MODULE=on go get sigs.k8s.io/kustomize/kustomize/v3
+
+$cp ./kustomize /usr/local/bin/
+$which kustomize
+/usr/local/bin/kustomize
+```
+
+ローカル環境でkustomizeの展開を確認
+```
+$sh local_kustomize_check_prod.sh
+```
+
 
 # 本番CloudSQL
 
@@ -196,6 +246,8 @@ mysql>
 
 # circleciのジョブをAPIから実行
 
+CIRCLE_API_USER_TOKENを事前に環境変数に設定して以下のコマンドを実行
+
 ```bash
 $ curl -XPOST https://circleci.com/api/v1.1/project/github/ludwig125/gke-stockprice/tree/master --user "${CIRCLE_API_USER_TOKEN}:" --header "Content-Type: application/json" -d '{
   "build_parameters": {
@@ -206,9 +258,7 @@ $ curl -XPOST https://circleci.com/api/v1.1/project/github/ludwig125/gke-stockpr
 
 # GKE操作
 
-### 作成
-
-クラスタの作成
+## クラスタの作成
 ```
 CLUSTER_NAME=gke-stockprice-cluster-prod
 COMPUTE_ZONE=us-central1-f
@@ -221,6 +271,14 @@ gcloud --quiet container clusters create $CLUSTER_NAME \
 ```
 - `-quiet`をつけることで作成時の「yes/no」の入力を省略できる
 
+## kubectlインストール
+
+```
+gcloud components update kubectl
+```
+
+- 結構時間がかかる
+
 kubectlが使えるようになるための認証
 
 ```
@@ -232,7 +290,23 @@ gcloud config set project $PROJECT_NAME
 gcloud config set container/cluster $CLUSTER_NAME
 gcloud config set compute/zone ${COMPUTE_ZONE}
 gcloud container clusters get-credentials $CLUSTER_NAME
-kubectl get pods
+```
+
+実行例
+```
+$kubectl get all
+NAME                                       READY   STATUS    RESTARTS   AGE
+pod/prod-gke-stockprice-1592512500-85rfl   1/2     Running   0          26h
+
+NAME                 TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.31.240.1   <none>        443/TCP   28h
+
+NAME                                       COMPLETIONS   DURATION   AGE
+job.batch/prod-gke-stockprice-1592512500   0/1           26h        26h
+
+NAME                                SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+cronjob.batch/prod-gke-stockprice   */1 * * * *   False     1        26h             26h
+$
 ```
 
 #### 実行中のコンテナへのシェルを取得
