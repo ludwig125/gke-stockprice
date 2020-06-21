@@ -39,6 +39,10 @@ configMapGenerator:
   behavior: replace
   literals:
   - flag=off
+- name: scrape-timeout
+  behavior: replace
+  literals:
+  - timeout=10000
 - name: moving-concurrency
   behavior: replace
   literals:
