@@ -127,6 +127,11 @@ spec:
                 secretKeyRef:
                   name: circleci-api-config
                   key: circleci_token
+            - name: SCRAPE_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: scrape-timeout
+                  key: timeout
             - name: GROWTHTREND_TARGETDATE
               valueFrom:
                 configMapKeyRef:

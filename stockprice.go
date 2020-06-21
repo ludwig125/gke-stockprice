@@ -196,11 +196,12 @@ func (sp DailyStockPrice) scrape(ctx context.Context, code string) ([]DatePrice,
 		datePrices = append(datePrices, p)
 	})
 	if datePrices == nil {
-		h, err := doc.Html()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get html: %v", err)
-		}
-		return nil, fmt.Errorf("failed to scrape stockprice. doc: %s", h)
+		return nil, fmt.Errorf("failed to scrape stockprice")
+		// h, err := doc.Html()
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed to get html: %v", err)
+		// }
+		// return nil, fmt.Errorf("failed to scrape stockprice. doc: %s", h)
 	}
 
 	//log.Println("err:", err) // TODO
