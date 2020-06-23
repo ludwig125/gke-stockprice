@@ -91,7 +91,7 @@ func (m CalculateMovingAvg) movingAvgs(code string) ([]DateMovingAvgs, error) {
 	// 直近200日分の終値を取得する
 	rc, err := m.recentCloses(code)
 	if err != nil {
-		return nil, fmt.Errorf("failed to recentCloses: %v", err)
+		return nil, fmt.Errorf("failed to get recentCloses: %v", err)
 	}
 
 	// (日付:移動平均)のMapを3, 5, 7,...ごとに格納したMap
