@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql" // MySQL driver
 	"github.com/pkg/errors"
@@ -47,6 +48,13 @@ func NewDB(dataSourceName string) (DB, error) {
 		return nil, fmt.Errorf("failed to Ping: %w", err)
 	}
 
+	// MySQLのコネクションが時間がたってInvalidにならないための工夫
+	// https://www.alexedwards.net/blog/configuring-sqldb
+	// https://making.pusher.com/production-ready-connection-pooling-in-go/
+	sqldb.SetMaxOpenConns(25)
+	sqldb.SetMaxIdleConns(25)
+	sqldb.SetConnMaxLifetime(5 * time.Minute)
+
 	db := &MySQL{sqldb}
 	// DBに接続されているか確認
 	if err := ensureDB(db); err != nil {
@@ -60,6 +68,7 @@ func openSQL(dataSourceName string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open DB: %w", err)
 	}
+
 	return db, nil
 }
 

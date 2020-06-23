@@ -252,7 +252,7 @@ type shortTrend struct {
 func (g CalculateGrowthTrend) previousTrend(code string, m5 float64) (shortTrend, error) {
 	closes, err := recentCloses(g.db, code, 2)
 	if err != nil {
-		return shortTrend{}, fmt.Errorf("failed to recentCloses: %w", err)
+		return shortTrend{}, fmt.Errorf("failed to get recentCloses: %w", err)
 	}
 	p := closes[0].Close
 	b := closes[1].Close
