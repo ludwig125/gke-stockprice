@@ -157,7 +157,7 @@ jobs:
       COMPUTE_ZONE: us-central1-f
       #MACHINE_TYPE: n1-standard-4
       MACHINE_TYPE: g1-small
-      NUM_NODES: 2
+      NUM_NODES: 3 # 2だと`nodes are available: 1 Insufficient memory, 2 Insufficient cpu.` となったので
     docker:
       - image: google/cloud-sdk:alpine
     steps:
@@ -187,20 +187,21 @@ jobs:
           no_output_timeout: 20m # これを防ぐ：Too long with no output (exceeded 10m0s)
           command: |
             if [ `gcloud container clusters list | grep $CLUSTER_NAME | wc -l` == 1 ]; then
+                # TODO: --preemptibleをつける？
                 # clusterが存在する場合、ERRORになっていないか確認
                 if [ `gcloud container clusters describe $CLUSTER_NAME | grep 'ERROR' | wc -l` != 0 ]; then
                     # うまく作れていないときは消してからもう一度作る
                     gcloud --quiet container clusters delete $CLUSTER_NAME
                     gcloud --quiet container clusters create $CLUSTER_NAME \
                     --machine-type=$MACHINE_TYPE --disk-size 10 --zone $COMPUTE_ZONE \
-                    --num-nodes=$NUM_NODES
+                    --num-nodes=$NUM_NODES --preemptible
                 fi
             elif [ `gcloud container clusters list | grep $CLUSTER_NAME | wc -l` == 0 ]; then
                 # clusterが存在しない場合はcreate
                 # --quiet をつけないと作成するかどうかy/nの入力を求める表示が出る
                 gcloud --quiet container clusters create $CLUSTER_NAME \
                 --machine-type=$MACHINE_TYPE --disk-size 10 --zone $COMPUTE_ZONE \
-                --num-nodes=$NUM_NODES
+                --num-nodes=$NUM_NODES --preemptible
             else
                 echo "$CLUSTER_NAME cluster already exists"
             fi
