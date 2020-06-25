@@ -229,7 +229,7 @@ func (sp DailyStockPrice) fetch(ctx context.Context, code string) (*goquery.Docu
 	log.Printf("trying to fetch daily stockprice. code: %s, url: %s", code, req.URL.String())
 	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
-		return nil, fmt.Errorf("failed to DefaultClient.Do: %v", err)
+		return nil, fmt.Errorf("failed to DefaultClient.Do: %v. timeout setting: %v", err, sp.fetchTimeout)
 	}
 	defer resp.Body.Close()
 

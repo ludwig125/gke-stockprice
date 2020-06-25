@@ -36,7 +36,7 @@ func TestGKEStockPrice(t *testing.T) {
 
 	instance := gcloud.CloudSQLInstance{
 		Project: "gke-stockprice",
-		//Instance: "gke-stockprice-cloudsql-integration-test-202003240621",
+		// Instance: "gke-stockprice-cloudsql-integration-test-202006260624",
 		Instance:     "gke-stockprice-cloudsql-integration-test-" + time.Now().Format("200601021504"),
 		Tier:         "db-f1-micro",
 		Region:       "us-central1",
@@ -120,6 +120,8 @@ func TestGKEStockPrice(t *testing.T) {
 	if err := checkTestDataInSheet(ctx); err != nil {
 		t.Errorf("failed to checkTestDataInSheet: %v", err)
 	}
+
+	// displaylogs()
 
 	// 成功したら、一旦cronを止めて、
 	// 次は、test用サーバのURLを本物のURLに差し替え（このURLは環境変数から取得する）てデプロイし直す
@@ -334,3 +336,7 @@ func checkTestDataInSheet(ctx context.Context) error {
 	}
 	return nil
 }
+
+// func displaylogs() {
+
+// }
