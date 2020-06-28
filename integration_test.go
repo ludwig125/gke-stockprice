@@ -48,7 +48,7 @@ func TestGKEStockPrice(t *testing.T) {
 	cluster := gcloud.GKECluster{
 		Project:     "gke-stockprice",
 		ClusterName: "gke-stockprice-cluster-integration-test",
-		ComputeZone: "us-central1-a",
+		ComputeZone: "us-central1-f",
 		MachineType: "g1-small",
 		ExecCmd:     true, // 実際に作成削除を行う
 	}
