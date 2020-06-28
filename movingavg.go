@@ -58,8 +58,8 @@ type CalculateMovingAvg struct {
 func (m CalculateMovingAvg) saveMovingAvgs(ctx context.Context, codes []string) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
-	//	sem := make(chan struct{}, m.calcConcurrency)
-	//	defer close(sem)
+	sem := make(chan struct{}, m.calcConcurrency)
+	defer close(sem)
 	for _, code := range codes {
 		code := code
 
@@ -68,10 +68,10 @@ func (m CalculateMovingAvg) saveMovingAvgs(ctx context.Context, codes []string) 
 			return ctx.Err()
 		default:
 		}
-		//sem <- struct{}{}
+		sem <- struct{}{}
 
 		eg.Go(func() error {
-			//	defer func() { <-sem }()
+			defer func() { <-sem }()
 			dm, err := m.movingAvgs(code)
 			if err != nil {
 				return fmt.Errorf("failed to calculateEachMovingAvg: %v", err)
