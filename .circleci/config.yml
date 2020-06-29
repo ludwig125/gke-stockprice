@@ -194,6 +194,7 @@ jobs:
                     gcloud --quiet container clusters delete $CLUSTER_NAME
                     gcloud --quiet container clusters create $CLUSTER_NAME \
                     --machine-type=$MACHINE_TYPE --disk-size 10 --zone $COMPUTE_ZONE \
+                    --no-enable-cloud-logging \
                     --num-nodes=$NUM_NODES --preemptible
                 fi
             elif [ `gcloud container clusters list | grep $CLUSTER_NAME | wc -l` == 0 ]; then
@@ -201,6 +202,7 @@ jobs:
                 # --quiet をつけないと作成するかどうかy/nの入力を求める表示が出る
                 gcloud --quiet container clusters create $CLUSTER_NAME \
                 --machine-type=$MACHINE_TYPE --disk-size 10 --zone $COMPUTE_ZONE \
+                --no-enable-cloud-logging \
                 --num-nodes=$NUM_NODES --preemptible
             else
                 echo "$CLUSTER_NAME cluster already exists"
