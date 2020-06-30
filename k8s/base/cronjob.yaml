@@ -11,7 +11,8 @@ spec:
   # https://kubernetes.io/ja/docs/concepts/workloads/controllers/cron-jobs/
   # 日本時間の平日9時から15時の30分に起動するために９時間マイナス
   #schedule: "30 0-6 * * 1-5"
-  schedule: "*/1 * * * *"
+  #schedule: "*/1 * * * *"
+  schedule: "0 */1 * * *" # 毎時０分
   concurrencyPolicy: Forbid # 前のCronが動いていたら動作しない
   jobTemplate:
     spec:
