@@ -31,8 +31,8 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 		return fmt.Errorf("currentTime is zero: %#v", d.dailyStockPrice.currentTime)
 	}
 
-	sp := d.dailyStockPrice
 	// 日足株価のスクレイピングとDBへの書き込み
+	sp := d.dailyStockPrice
 	failedCodes, err := sp.saveStockPrice(ctx, codes)
 	if err != nil {
 		return fmt.Errorf("failed to fetchStockPrice: %v", mergeErr(err, failedCodes))
