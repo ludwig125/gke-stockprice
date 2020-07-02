@@ -209,15 +209,15 @@ func deployGKEStockprice(instance gcloud.CloudSQLInstance) error {
 	// TODO "secret" じゃなくて普通にConfigでいい気がする
 	// Secretを環境変数として読み込むためにファイルを配置する
 	secretFiles := []gcloud.GKESecretFile{
-		gcloud.GKESecretFile{
+		{
 			Filename: "db_connection_name.txt",
 			Content:  ist.ConnectionName,
 		},
-		gcloud.GKESecretFile{
+		{
 			Filename: "daily_price_url.txt",
 			Content:  "http://" + clusterIP,
 		},
-		gcloud.GKESecretFile{
+		{
 			Filename: "growthtrend_targetdate.txt",
 			Content:  targetDate,
 		},
