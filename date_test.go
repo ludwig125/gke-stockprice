@@ -35,7 +35,7 @@ func TestIsHoliday(t *testing.T) {
 	}{
 		{
 			"holiday",
-			[][]string{[]string{"2019/01/01"}, []string{"2019/01/02"}, []string{"2019/01/03"}},
+			[][]string{{"2019/01/01"}, {"2019/01/02"}, {"2019/01/03"}},
 			nil,
 			time.Date(2019, 1, 3, 0, 0, 0, 0, time.Local),
 			true, // sheetから返す値に含まれる日を指定したのでtrue
@@ -43,7 +43,7 @@ func TestIsHoliday(t *testing.T) {
 		},
 		{
 			"notholiday",
-			[][]string{[]string{"2019/01/01"}, []string{"2019/01/02"}, []string{"2019/01/03"}},
+			[][]string{{"2019/01/01"}, {"2019/01/02"}, {"2019/01/03"}},
 			nil,
 			time.Date(2019, 1, 4, 0, 0, 0, 0, time.Local),
 			false, // sheetから返す値に含まれない日を指定したのでfalse

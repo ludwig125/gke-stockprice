@@ -58,14 +58,14 @@ type CodeSpreadSheetMock struct {
 
 func (s CodeSpreadSheetMock) Read() ([][]string, error) {
 	return [][]string{
-		[]string{"100"},
-		[]string{"101"},
-		[]string{"102"},
-		[]string{"103"},
-		[]string{"104"},
-		[]string{"105"},
-		[]string{"106"},
-		[]string{"107"},
+		{"100"},
+		{"101"},
+		{"102"},
+		{"103"},
+		{"104"},
+		{"105"},
+		{"106"},
+		{"107"},
 	}, nil
 }
 
