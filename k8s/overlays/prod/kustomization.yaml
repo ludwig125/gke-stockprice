@@ -1,3 +1,6 @@
+kind: Kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+
 namePrefix: prod-
 commonLabels:
   variant: prod
@@ -74,3 +77,5 @@ secretGenerator:
   behavior: replace
   files:
   - circleci_token=circleci_token.txt
+patchesStrategicMerge:
+- patch_cron_schedule.yaml

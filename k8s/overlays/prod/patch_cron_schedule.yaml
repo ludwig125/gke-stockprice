@@ -1,0 +1,12 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: gke-stockprice
+  labels:
+    app: gke-stockprice
+spec:
+  # cron ref
+  # https://en.wikipedia.org/wiki/Cron
+  # https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/
+  # https://kubernetes.io/ja/docs/concepts/workloads/controllers/cron-jobs/
+  schedule: "0 */1 * * *" # 毎時0分に起動
