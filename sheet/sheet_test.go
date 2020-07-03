@@ -27,8 +27,8 @@ func TestSheet(t *testing.T) {
 	ts := sheet.NewSpreadSheet(srv, mustGetenv("INTEGRATION_TEST_SHEETID"), "unittest")
 
 	testdata := [][]string{
-		[]string{"a", "b", "c"},
-		[]string{"d", "e", "f"},
+		{"a", "b", "c"},
+		{"d", "e", "f"},
 	}
 	if err := ts.Update(testdata); err != nil {
 		t.Error(err)
@@ -38,12 +38,12 @@ func TestSheet(t *testing.T) {
 		t.Error(err)
 	}
 	want := [][]string{
-		[]string{"a", "b", "c"},
-		[]string{"d", "e", "f"},
-		[]string{"a", "b", "c"},
-		[]string{"d", "e", "f"},
-		[]string{"a", "b", "c"},
-		[]string{"d", "e", "f"},
+		{"a", "b", "c"},
+		{"d", "e", "f"},
+		{"a", "b", "c"},
+		{"d", "e", "f"},
+		{"a", "b", "c"},
+		{"d", "e", "f"},
 	}
 	got, err := ts.Read()
 	if err != nil {

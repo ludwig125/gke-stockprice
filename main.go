@@ -113,7 +113,7 @@ func execDailyProcess(ctx context.Context) error {
 	}
 	log.Println("got sheet service successfully")
 
-	if env == "prod" && os.Getenv("CHECK_HOLIDAY") == "on"  {
+	if env == "prod" && os.Getenv("CHECK_HOLIDAY") == "on" {
 		holidaySheet := sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday")
 		isHoli, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
 		if err != nil {
@@ -143,8 +143,11 @@ func execDailyProcess(ctx context.Context) error {
 		return errors.New("no target company codes")
 	}
 
-	// 株価trendを表示するためSheet
+	// 株価trendを表示するためのSheet
 	trendSheet := sheet.NewSpreadSheet(srv, mustGetenv("TREND_SHEETID"), "trend")
+
+	// daily処理の進捗を管理するためのSheet
+	statusSheet := sheet.NewSpreadSheet(srv, mustGetenv("STATUS"), "status")
 
 	d := daily{
 		dailyStockPrice: DailyStockPrice{
