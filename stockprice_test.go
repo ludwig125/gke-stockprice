@@ -82,10 +82,10 @@ func TestStockPrice(t *testing.T) {
 				dailyStockpriceURL: ts.URL + "/",
 				fetchInterval:      10 * time.Millisecond,
 				fetchTimeout:       1 * time.Second,
-				currentTime:        time.Date(2019, 12, 1, 0, 0, 0, 0, time.Local),
 			}
 
-			failedCodes, err := sp.saveStockPrice(ctx, tc.codes)
+			currentTime := time.Date(2019, 12, 1, 0, 0, 0, 0, time.Local)
+			failedCodes, err := sp.saveStockPrice(ctx, tc.codes, currentTime)
 			if err != nil {
 				t.Fatalf("error: %v", err)
 			}
@@ -193,9 +193,9 @@ func TestScrape(t *testing.T) {
 			sp := DailyStockPrice{
 				dailyStockpriceURL: ts.URL,
 				fetchTimeout:       10 * time.Millisecond,
-				currentTime:        time.Date(2019, 12, 1, 0, 0, 0, 0, time.Local),
 			}
-			prices, err := sp.scrape(ctx, tc.code)
+			currentTime := time.Date(2019, 12, 1, 0, 0, 0, 0, time.Local)
+			prices, err := sp.scrape(ctx, tc.code, currentTime)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("error: %v, wantErr: %t", err, tc.wantErr)
 				return

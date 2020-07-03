@@ -31,8 +31,7 @@ jobs:
             echo Failed waiting for MySQL && exit 1
       - run:
           name: test
-          #command: go test -v slack.go slack_test.go
-          #command: go test -v database/database*
+          # local（WSL）で実行するときは事前に`sudo service mysql start`が必要
           command: |
             go test -v -race -p 1 ./...
       - save_cache:
