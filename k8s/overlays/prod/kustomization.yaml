@@ -67,6 +67,7 @@ secretGenerator:
   - holiday_sheetid=sheetid.txt # 事前に配置しておく
   - companycode_sheetid=sheetid.txt # 事前に配置しておく
   - trend_sheetid=sheetid.txt # 事前に配置しておく
+  - status_sheetid=sheetid.txt # 事前に配置しておく
 
 - name: slack-config
   behavior: replace

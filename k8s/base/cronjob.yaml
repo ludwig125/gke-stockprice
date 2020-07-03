@@ -116,6 +116,11 @@ spec:
                 secretKeyRef:
                   name: sheetids
                   key: trend_sheetid
+            - name: STATUS_SHEETID
+              valueFrom:
+                secretKeyRef:
+                  name: sheetids
+                  key: status_sheetid
             - name: SLACK_TOKEN
               valueFrom:
                 secretKeyRef:

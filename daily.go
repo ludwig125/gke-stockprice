@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+
+	"github.com/ludwig125/gke-stockprice/sheet"
 )
 
 type daily struct {
+	status               sheet.Sheet
 	dailyStockPrice      DailyStockPrice
 	calculateMovingAvg   CalculateMovingAvg
 	calculateGrowthTrend CalculateGrowthTrend
@@ -30,6 +33,9 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 		log.Println("currentTime is zero")
 		return fmt.Errorf("currentTime is zero: %#v", d.dailyStockPrice.currentTime)
 	}
+
+	// // dailyStockPriceが完了済みであればスキップ
+	// if isDone("dailyStockPrice",d.dailyStockPrice.currentTime)
 
 	// 日足株価のスクレイピングとDBへの書き込み
 	sp := d.dailyStockPrice
