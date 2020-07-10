@@ -20,9 +20,8 @@ import (
 )
 
 var (
-	jst        = getLocation() // タイムゾーンを全体で使う
-	env        = useEnvOrDefault("ENV", "dev")
-	timeNowJST = time.Now().In(jst)
+	jst = getLocation() // タイムゾーンを全体で使う
+	env = useEnvOrDefault("ENV", "dev")
 )
 
 func getLocation() *time.Location {
@@ -108,7 +107,7 @@ func execDailyProcess(ctx context.Context) error {
 	log.Println("connected db successfully")
 
 	// spreadsheetのserviceを取得
-	srv, err := getSheetService(ctx)
+	srv, err := getSheetService(ctx, mustGetenv("SHEET_CREDENTIAL"))
 	if err != nil {
 		return fmt.Errorf("failed to getSheetService: %v", err)
 	}
@@ -149,9 +148,9 @@ func execDailyProcess(ctx context.Context) error {
 
 	// daily処理の進捗を管理するためのSheet
 	statusSheet := sheet.NewSpreadSheet(srv, mustGetenv("STATUS"), "status")
-
 	d := daily{
-		currentTime: timeNowJST,
+		currentTime: time.Now().In(jst),
+		status:      statusSheet,
 		dailyStockPrice: DailyStockPrice{
 			db:                 db,
 			dailyStockpriceURL: mustGetenv("DAILY_PRICE_URL"),                                                          // 日足株価scrape先のURL
@@ -262,9 +261,8 @@ func getDatabase(ctx context.Context) (database.DB, error) {
 	return db, nil
 }
 
-func getSheetService(ctx context.Context) (*sheets.Service, error) {
-	c := mustGetenv("SHEET_CREDENTIAL")
-	srv, err := sheet.GetSheetClient(ctx, c)
+func getSheetService(ctx context.Context, credential string) (*sheets.Service, error) {
+	srv, err := sheet.GetSheetClient(ctx, credential)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sheet service. err: %v", err)
 	}

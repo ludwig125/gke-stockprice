@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/ludwig125/gke-stockprice/sheet"
+	"github.com/ludwig125/gke-stockprice/status"
 )
 
 type daily struct {
-	currentTime: time.Time
+	currentTime          time.Time
 	status               sheet.Sheet
 	dailyStockPrice      DailyStockPrice
 	calculateMovingAvg   CalculateMovingAvg
@@ -35,8 +37,8 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 		return fmt.Errorf("currentTime is zero: %#v", d.currentTime)
 	}
 
-	// // dailyStockPriceが完了済みであればスキップ
-	// if isDone("dailyStockPrice",d.dailyStockPrice.currentTime)
+	// Status管理用の変数
+	st := status.Status{Sheet: d.status}
 
 	// 日足株価のスクレイピングとDBへの書き込み
 	sp := d.dailyStockPrice
@@ -46,6 +48,8 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 	}
 
 	// TODO: 全部スクレイピングできていなかったら再度試みる処理を入れたい
+	// - failedCodesを使って、もう一度（または数回）saveStockPriceを実行する
+	// - それでも失敗したものをあらためてfailedCodesとする
 	// TODO: 最初に取得した株価が全部格納されているか確認したい
 
 	targetCodes := filterCodes(codes, failedCodes)
@@ -61,7 +65,9 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 
 	// 株価の増減トレンドをSpreadSheetに記載
 	g := d.calculateGrowthTrend
-	if err := g.growthTrend(ctx, targetCodes); err != nil {
+	if err := st.ExecIfIncompleteThisDay("calculateGrowthTrend", d.currentTime, func() error {
+		return g.growthTrend(ctx, targetCodes)
+	}); err != nil {
 		return fmt.Errorf("failed to growthTrend: %v", mergeErr(err, failedCodes))
 	}
 
