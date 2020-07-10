@@ -20,8 +20,9 @@ import (
 )
 
 var (
-	jst = getLocation() // タイムゾーンを全体で使う
-	env = useEnvOrDefault("ENV", "dev")
+	jst        = getLocation() // タイムゾーンを全体で使う
+	env        = useEnvOrDefault("ENV", "dev")
+	timeNowJST = time.Now().In(jst)
 )
 
 func getLocation() *time.Location {
@@ -150,12 +151,12 @@ func execDailyProcess(ctx context.Context) error {
 	statusSheet := sheet.NewSpreadSheet(srv, mustGetenv("STATUS"), "status")
 
 	d := daily{
+		currentTime: timeNowJST,
 		dailyStockPrice: DailyStockPrice{
 			db:                 db,
 			dailyStockpriceURL: mustGetenv("DAILY_PRICE_URL"),                                                          // 日足株価scrape先のURL
 			fetchInterval:      time.Duration(strToInt(useEnvOrDefault("SCRAPE_INTERVAL", "1000"))) * time.Millisecond, // スクレイピングの間隔(millisec)
 			fetchTimeout:       time.Duration(strToInt(useEnvOrDefault("SCRAPE_TIMEOUT", "1000"))) * time.Millisecond,  // スクレイピングのtimeout(millisec)
-			currentTime:        time.Now().In(jst),
 		},
 		calculateMovingAvg: CalculateMovingAvg{
 			db:              db,
