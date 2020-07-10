@@ -39,6 +39,10 @@ func (s TrendSpreadSheetMock) Update(ss [][]string) error {
 	return nil
 }
 
+func (s TrendSpreadSheetMock) Clear() error {
+	return nil
+}
+
 type CloseTestData struct {
 	Num  int
 	Rate int
