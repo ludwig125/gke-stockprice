@@ -9,6 +9,7 @@ import (
 )
 
 type daily struct {
+	currentTime: time.Time
 	status               sheet.Sheet
 	dailyStockPrice      DailyStockPrice
 	calculateMovingAvg   CalculateMovingAvg
@@ -29,9 +30,9 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 		return nil
 	}
 
-	if d.dailyStockPrice.currentTime.IsZero() {
+	if d.currentTime.IsZero() {
 		log.Println("currentTime is zero")
-		return fmt.Errorf("currentTime is zero: %#v", d.dailyStockPrice.currentTime)
+		return fmt.Errorf("currentTime is zero: %#v", d.currentTime)
 	}
 
 	// // dailyStockPriceが完了済みであればスキップ
@@ -39,7 +40,7 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 
 	// 日足株価のスクレイピングとDBへの書き込み
 	sp := d.dailyStockPrice
-	failedCodes, err := sp.saveStockPrice(ctx, codes)
+	failedCodes, err := sp.saveStockPrice(ctx, codes, d.currentTime)
 	if err != nil {
 		return fmt.Errorf("failed to fetchStockPrice: %v", mergeErr(err, failedCodes))
 	}

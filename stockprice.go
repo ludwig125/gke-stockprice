@@ -73,10 +73,9 @@ type DailyStockPrice struct {
 	dailyStockpriceURL string
 	fetchInterval      time.Duration
 	fetchTimeout       time.Duration
-	currentTime        time.Time
 }
 
-func (sp DailyStockPrice) saveStockPrice(ctx context.Context, codes []string) (FailedCodes, error) {
+func (sp DailyStockPrice) saveStockPrice(ctx context.Context, codes []string, currentTime time.Time) (FailedCodes, error) {
 	// scrapeで発生したerrorは全部failedCodeに入れて最後に返す
 	var failedCodes FailedCodes
 	var mu sync.Mutex
@@ -103,7 +102,7 @@ func (sp DailyStockPrice) saveStockPrice(ctx context.Context, codes []string) (F
 
 			eg.Go(func() error {
 				s := time.Now()
-				prices, err := sp.scrape(ctx, code)
+				prices, err := sp.scrape(ctx, code, currentTime)
 				if err != nil {
 					mu.Lock()
 					failedCodes = append(failedCodes, FailedCode{err: err, code: code})
@@ -135,10 +134,10 @@ func (sp DailyStockPrice) insertCodePricesToDB(csp CodePrices) error {
 	return sp.db.InsertDB("daily", codePrices)
 }
 
-func (sp DailyStockPrice) scrape(ctx context.Context, code string) ([]DatePrice, error) {
-	if sp.currentTime.IsZero() {
+func (sp DailyStockPrice) scrape(ctx context.Context, code string, currentTime time.Time) ([]DatePrice, error) {
+	if currentTime.IsZero() {
 		log.Println("currentTime is zero")
-		return nil, fmt.Errorf("currentTime is zero: %#v", sp.currentTime)
+		return nil, fmt.Errorf("currentTime is zero: %#v", currentTime)
 	}
 	doc, err := sp.fetch(ctx, code)
 	if err != nil {
@@ -158,7 +157,7 @@ func (sp DailyStockPrice) scrape(ctx context.Context, code string) ([]DatePrice,
 		// 正規表現で前後の空白などを除いた日付を取得
 		re := regexp.MustCompile(`[0-9]+/[0-9]+`).Copy()
 		// 現在時刻を参考にスクレイピングで取得した日付に年をつけたりゼロ埋めする
-		if date, err = formatDate(sp.currentTime, re.FindString(rawDate)); err != nil {
+		if date, err = formatDate(currentTime, re.FindString(rawDate)); err != nil {
 			return
 		}
 		//log.Println("date:", date, "raw", re.FindString(rawDate), sp.currentTime)
