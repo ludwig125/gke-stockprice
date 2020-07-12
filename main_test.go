@@ -76,7 +76,9 @@ func (s CodeSpreadSheetMock) Insert([][]string) error {
 func (s CodeSpreadSheetMock) Update([][]string) error {
 	return nil
 }
-
+func (s CodeSpreadSheetMock) Clear() error {
+	return nil
+}
 func TestFetchCompanyCode(t *testing.T) {
 	var srv *sheets.Service
 	codeSheet := CodeSpreadSheetMock{

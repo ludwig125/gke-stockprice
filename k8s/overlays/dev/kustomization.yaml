@@ -50,3 +50,4 @@ secretGenerator:
   - holiday_sheetid=dev_sheetid.txt # integration_test前に配置しておく
   - companycode_sheetid=dev_sheetid.txt # integration_test前に配置しておく
   - trend_sheetid=dev_sheetid.txt # integration_test前に配置しておく
+  - status_sheetid=dev_sheetid.txt # integration_test前に配置しておく

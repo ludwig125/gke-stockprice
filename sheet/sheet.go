@@ -50,6 +50,7 @@ type Sheet interface {
 	Read() ([][]string, error)
 	Insert([][]string) error
 	Update([][]string) error
+	Clear() error
 }
 
 // SpreadSheet has SpreadsheetID and ReadRange to identify sheet
@@ -106,11 +107,24 @@ func (s SpreadSheet) Insert(inputs [][]string) error {
 
 // Update clear spreadsheet and write data
 func (s SpreadSheet) Update(inputs [][]string) error {
-	if err := clear(s.Service, s.SpreadsheetID, s.ReadRange); err != nil {
+	if err := s.Clear(); err != nil {
 		return fmt.Errorf("failed to clear sheet: %w", err)
 	}
 	if err := write(s.Service, s.SpreadsheetID, s.ReadRange, inputs); err != nil {
 		return fmt.Errorf("failed to write sheet: %w", err)
+	}
+	return nil
+}
+
+// Clear delete all spreadsheet data.
+func (s SpreadSheet) Clear() error {
+	resp, err := s.Service.Spreadsheets.Values.Clear(s.SpreadsheetID, s.ReadRange, &sheets.ClearValuesRequest{}).Do()
+	if err != nil {
+		return fmt.Errorf("unable to clear value. %v", err)
+	}
+	status := resp.ServerResponse.HTTPStatusCode
+	if status != 200 {
+		return fmt.Errorf("HTTPstatus error. %v", status)
 	}
 	return nil
 }
@@ -146,17 +160,17 @@ func interfaceSlices(sss [][]string) [][]interface{} {
 	return iss
 }
 
-func clear(srv *sheets.Service, sid, srange string) error {
-	resp, err := srv.Spreadsheets.Values.Clear(sid, srange, &sheets.ClearValuesRequest{}).Do()
-	if err != nil {
-		return fmt.Errorf("unable to clear value. %v", err)
-	}
-	status := resp.ServerResponse.HTTPStatusCode
-	if status != 200 {
-		return fmt.Errorf("HTTPstatus error. %v", status)
-	}
-	return nil
-}
+// func clear(srv *sheets.Service, sid, srange string) error {
+// 	resp, err := srv.Spreadsheets.Values.Clear(sid, srange, &sheets.ClearValuesRequest{}).Do()
+// 	if err != nil {
+// 		return fmt.Errorf("unable to clear value. %v", err)
+// 	}
+// 	status := resp.ServerResponse.HTTPStatusCode
+// 	if status != 200 {
+// 		return fmt.Errorf("HTTPstatus error. %v", status)
+// 	}
+// 	return nil
+// }
 
 // func Read(r *http.Request, srv *sheets.Service, sheetID string, readRange string) [][]interface{} {
 // 	ctx := appengine.NewContext(r)
