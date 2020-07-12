@@ -24,6 +24,10 @@ func (s HolidaySpreadSheetMock) Update([][]string) error {
 	return nil
 }
 
+func (s HolidaySpreadSheetMock) Clear() error {
+	return nil
+}
+
 func TestIsHoliday(t *testing.T) {
 	cases := []struct {
 		name      string

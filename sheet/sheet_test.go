@@ -16,7 +16,7 @@ func TestSheet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sheetCredential := mustGetenv("SHEET_CREDENTIAL")
+	sheetCredential := mustGetenv(t, "SHEET_CREDENTIAL")
 	// spreadsheetのserviceを取得
 	srv, err := sheet.GetSheetClient(ctx, "../"+sheetCredential)
 	if err != nil {
@@ -24,11 +24,11 @@ func TestSheet(t *testing.T) {
 	}
 	log.Println("succeeded to get sheet service")
 
-	ts := sheet.NewSpreadSheet(srv, mustGetenv("INTEGRATION_TEST_SHEETID"), "unittest")
+	ts := sheet.NewSpreadSheet(srv, mustGetenv(t, "INTEGRATION_TEST_SHEETID"), "unittest")
 
 	testdata := [][]string{
-		[]string{"a", "b", "c"},
-		[]string{"d", "e", "f"},
+		{"a", "b", "c"},
+		{"d", "e", "f"},
 	}
 	if err := ts.Update(testdata); err != nil {
 		t.Error(err)
@@ -38,12 +38,12 @@ func TestSheet(t *testing.T) {
 		t.Error(err)
 	}
 	want := [][]string{
-		[]string{"a", "b", "c"},
-		[]string{"d", "e", "f"},
-		[]string{"a", "b", "c"},
-		[]string{"d", "e", "f"},
-		[]string{"a", "b", "c"},
-		[]string{"d", "e", "f"},
+		{"a", "b", "c"},
+		{"d", "e", "f"},
+		{"a", "b", "c"},
+		{"d", "e", "f"},
+		{"a", "b", "c"},
+		{"d", "e", "f"},
 	}
 	got, err := ts.Read()
 	if err != nil {
@@ -68,12 +68,11 @@ func TestSheet(t *testing.T) {
 	}
 }
 
-func mustGetenv(k string) string {
+func mustGetenv(t *testing.T, k string) string {
 	v := os.Getenv(k)
 	if v == "" {
-		log.Fatalf("%s environment variable not set", k)
+		t.Fatalf("%s environment variable not set", k)
 	}
-	log.Printf("%s environment variable set", k)
 	return v
 }
 
