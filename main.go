@@ -147,7 +147,7 @@ func execDailyProcess(ctx context.Context) error {
 	trendSheet := sheet.NewSpreadSheet(srv, mustGetenv("TREND_SHEETID"), "trend")
 
 	// daily処理の進捗を管理するためのSheet
-	statusSheet := sheet.NewSpreadSheet(srv, mustGetenv("STATUS"), "status")
+	statusSheet := sheet.NewSpreadSheet(srv, mustGetenv("STATUS_SHEETID"), "status")
 	d := daily{
 		currentTime: time.Now().In(jst),
 		status:      statusSheet,
@@ -180,7 +180,7 @@ func execDailyProcess(ctx context.Context) error {
 func mustGetenv(k string) string {
 	v := os.Getenv(k)
 	if v == "" {
-		log.Panicf("%s environment variable not set", k)
+		log.Panicf("environment variable '%s' not set", k)
 	}
 	log.Printf("%s environment variable set", k)
 
