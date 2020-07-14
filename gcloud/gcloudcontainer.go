@@ -33,7 +33,7 @@ func (c GKECluster) CreateCluster() error {
 
 	cmd := fmt.Sprintf(`gcloud --quiet container clusters create %s \
 	--disk-size 10 --zone %s --machine-type=%s \
-	--num-nodes=4 --preemptible`, c.ClusterName, c.ComputeZone, c.MachineType)
+	--num-nodes=4 --no-enable-cloud-logging --preemptible`, c.ClusterName, c.ComputeZone, c.MachineType)
 	res, err := command.ExecAndWait(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
