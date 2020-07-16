@@ -22,6 +22,7 @@ import (
 var (
 	jst = getLocation() // タイムゾーンを全体で使う
 	env = useEnvOrDefault("ENV", "dev")
+	now = func() time.Time { return time.Now().In(jst) }
 )
 
 func getLocation() *time.Location {
@@ -149,8 +150,7 @@ func execDailyProcess(ctx context.Context) error {
 	// daily処理の進捗を管理するためのSheet
 	statusSheet := sheet.NewSpreadSheet(srv, mustGetenv("STATUS"), "status")
 	d := daily{
-		currentTime: time.Now().In(jst),
-		status:      statusSheet,
+		status: statusSheet,
 		dailyStockPrice: DailyStockPrice{
 			db:                 db,
 			dailyStockpriceURL: mustGetenv("DAILY_PRICE_URL"),                                                          // 日足株価scrape先のURL

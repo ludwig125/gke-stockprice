@@ -269,10 +269,7 @@ func checkTestDataInDB(ctx context.Context) error {
 		db, e = database.NewDB(fmt.Sprintf("%s/%s",
 			getDSN("root", "", "127.0.0.1:3307"),
 			"stockprice_dev"))
-		if e != nil {
-			return e
-		}
-		return nil
+		return e
 	}); err != nil {
 		return fmt.Errorf("failed to NewDB: %w", err)
 	}

@@ -90,7 +90,8 @@ func (s Status) IsTaskDoneAfter(task string, u int64) (bool, error) {
 
 // ExecIfIncompleteThisDay executes task when it is not done this day.
 func (s Status) ExecIfIncompleteThisDay(task string, thisTime time.Time, fn func() error) error {
-	ok, err := s.IsTaskDoneAfter(task, thisTime.Unix())
+	// thisTimeの日の0時0分0秒より後にtaskが完了したかどうかを確認する
+	ok, err := s.IsTaskDoneAfter(task, getMidnightUnixtime(thisTime))
 	if err != nil {
 		return fmt.Errorf("failed to IsTaskDoneAfter: %v", err)
 	}
@@ -115,6 +116,4 @@ func getMidnightUnixtime(t time.Time) int64 {
 	return m.Unix()
 }
 
-var now = func() time.Time {
-	return time.Now().In(time.Local)
-}
+var now = func() time.Time { return time.Now().In(time.Local) }
