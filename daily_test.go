@@ -8,7 +8,31 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TestFilterCodes(t *testing.T) {
+func TestFailedCodesSlice(t *testing.T) {
+	tests := map[string]struct {
+		failedCodes FailedCodes
+		wants       []string
+	}{
+		"no_fcodes": {
+			failedCodes: FailedCodes{},
+			wants:       []string{},
+		},
+		"2fcodes": {
+			failedCodes: FailedCodes{FailedCode{err: errors.New("90000 error"), code: "90000"}, FailedCode{err: errors.New("90001 error"), code: "90001"}},
+			wants:       []string{"90000", "90001"},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fcodes := failedCodesSlice(tc.failedCodes)
+			if !reflect.DeepEqual(fcodes, tc.wants) {
+				t.Fatalf("got: %#v, want: %v", fcodes, tc.wants)
+			}
+		})
+	}
+}
+
+func TestFilterSuccessCodes(t *testing.T) {
 	tests := map[string]struct {
 		codes             []string
 		failedCodes       FailedCodes
@@ -32,7 +56,7 @@ func TestFilterCodes(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			filteredCodes := filterCodes(tc.codes, tc.failedCodes)
+			filteredCodes := filterSuccessCodes(tc.codes, tc.failedCodes)
 			if !reflect.DeepEqual(filteredCodes, tc.wantFilteredCodes) {
 				t.Fatalf("got filteredCodes: %#v, want wantFilteredCodes: %v", filteredCodes, tc.wantFilteredCodes)
 			}
