@@ -17,9 +17,10 @@ type Status struct {
 
 // Task is struct to manage task status.
 type Task struct {
-	task     string
-	unixtime int64
-	jst      string
+	task       string
+	unixtime   int64
+	jst        string
+	turnaround string
 }
 
 // ClearStatus clears spreadsheet status data.
@@ -30,10 +31,10 @@ func (s Status) ClearStatus() error {
 	return nil
 }
 
-// UpdateStatus updates spreadsheet status.
-func (s Status) UpdateStatus(task string, t time.Time) error {
+// InsertStatus updates spreadsheet status.
+func (s Status) InsertStatus(task string, t time.Time, t2 time.Duration) error {
 	status := [][]string{
-		{task, fmt.Sprintf("%d", t.Unix()), t.Format("2006-01-02 15:04:05")},
+		{task, fmt.Sprintf("%d", t.Unix()), t.Format("2006-01-02 15:04:05"), fmt.Sprintf("%v", t2)},
 	}
 
 	if err := s.Sheet.Insert(status); err != nil {
@@ -42,7 +43,7 @@ func (s Status) UpdateStatus(task string, t time.Time) error {
 	return nil
 }
 
-// FetchStatus fetches spreadsheet status.
+// FetchStatus fetches spreadsheet status all tasks.
 func (s Status) FetchStatus() ([][]string, error) {
 	tasks, err := s.Sheet.Read()
 	if err != nil {
@@ -54,14 +55,15 @@ func (s Status) FetchStatus() ([][]string, error) {
 func taskStatus(tasks [][]string, task string) (Task, error) {
 	for i := len(tasks) - 1; i >= 0; i-- { // taskが新旧重複している可能性があるのでstatusの下の行から見ていく
 		t := tasks[i]
-		//fmt.Println("tasks status", tasks[i])
-		if t[0] == task {
-			u, err := strconv.Atoi(t[1])
-			if err != nil {
-				return Task{}, fmt.Errorf("failed to convert %s to int: %v", t[1], err)
-			}
-			return Task{task: t[0], unixtime: int64(u), jst: t[2]}, nil
+
+		if t[0] != task {
+			continue
 		}
+		u, err := strconv.Atoi(t[1])
+		if err != nil {
+			return Task{}, fmt.Errorf("failed to convert %s to int: %v", t[1], err)
+		}
+		return Task{task: t[0], unixtime: int64(u), jst: t[2], turnaround: t[3]}, nil
 	}
 	return Task{}, fmt.Errorf("failed to fetch task '%s' from status sheet", task)
 }
@@ -90,6 +92,7 @@ func (s Status) IsTaskDoneAfter(task string, u int64) (bool, error) {
 
 // ExecIfIncompleteThisDay executes task when it is not done this day.
 func (s Status) ExecIfIncompleteThisDay(task string, thisTime time.Time, fn func() error) error {
+	start := time.Now()
 	// thisTimeの日の0時0分0秒より後にtaskが完了したかどうかを確認する
 	ok, err := s.IsTaskDoneAfter(task, getMidnightUnixtime(thisTime))
 	if err != nil {
@@ -103,8 +106,10 @@ func (s Status) ExecIfIncompleteThisDay(task string, thisTime time.Time, fn func
 		return fmt.Errorf("failed to fn: %v", err)
 	}
 
-	if err := s.UpdateStatus(task, now()); err != nil {
-		return fmt.Errorf("failed to UpdateStatus: %v", err)
+	turnaround := time.Since(start)
+	// InsertStatusにはtask名、現在時刻（thisTImeとして渡された時刻＋所要時間）、所要時間（turnaround）を設定
+	if err := s.InsertStatus(task, thisTime.Add(turnaround), turnaround); err != nil {
+		return fmt.Errorf("failed to InsertStatus: %v", err)
 	}
 	return nil
 }
@@ -115,5 +120,3 @@ func getMidnightUnixtime(t time.Time) int64 {
 	m := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
 	return m.Unix()
 }
-
-var now = func() time.Time { return time.Now().In(time.Local) }
