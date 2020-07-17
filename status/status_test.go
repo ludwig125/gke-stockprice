@@ -11,7 +11,7 @@ import (
 	"github.com/ludwig125/gke-stockprice/sheet"
 )
 
-func TestStatus(t *testing.T) {
+func TestStatus(t *testing.T) { // Statusの機能全体を通したTest
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -29,15 +29,16 @@ func TestStatus(t *testing.T) {
 	t.Run("ClearStatus", func(t *testing.T) {
 		s.ClearStatus()
 	})
-	t.Run("UpdateStatus", func(t *testing.T) {
-		s.UpdateStatus("task1", time.Date(2020, 1, 3, 23, 59, 59, 0, time.Local))
-		s.UpdateStatus("task2", time.Date(2020, 1, 4, 0, 0, 0, 0, time.Local))
-		s.UpdateStatus("task3", time.Date(2020, 1, 4, 0, 0, 1, 0, time.Local))
+	t.Run("InsertStatus", func(t *testing.T) {
+		s.InsertStatus("task1", time.Date(2020, 1, 3, 23, 59, 59, 0, time.Local), 100*time.Nanosecond)
+		s.InsertStatus("task2", time.Date(2020, 1, 4, 0, 0, 0, 0, time.Local), 200*time.Nanosecond)
+		s.InsertStatus("task3", time.Date(2020, 1, 4, 0, 0, 1, 0, time.Local), 300*time.Nanosecond)
 	})
 
-	// 上で入れたtaskのstatusが終了済みかどうかを確認する
 	// 2020-01-04の午前0時0分0秒を取得
 	midnight := getMidnightUnixtime(time.Date(2020, 1, 4, 23, 59, 59, 0, time.Local))
+
+	// 上で入れたtaskのstatusが終了済みかどうかを確認する
 	tests := map[string]struct {
 		task string
 		want bool
@@ -61,7 +62,7 @@ func TestStatus(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run("IsTaskDoneAfter:"+name, func(t *testing.T) {
-			got, err := s.IsTaskDoneAfter(tc.task, midnight)
+			got, err := s.IsTaskDoneAfter(tc.task, midnight) //2020-01-04の午前0時0分0秒以降に終わっているかどうかの確認
 			if err != nil {
 				t.Fatalf("failed to IsTaskDoneAfter:%v", err)
 			}
@@ -94,14 +95,10 @@ func TestStatus(t *testing.T) {
 	}
 	for name, tc := range tests2 {
 		t.Run("ExecIfIncompleteThisDay:"+name, func(t *testing.T) {
-			tmpFn := now
-			defer func() {
-				now = tmpFn
-			}()
-			now = func() time.Time { return time.Date(2020, 1, 4, 13, 0, 0, 0, time.Local) } // 現在時刻は2020-01-04 13:00とする
-
 			got := ""
-			err := s.ExecIfIncompleteThisDay(tc.task, time.Unix(midnight, 0), func() error {
+			// 現在時刻を2020-01-04の午前5時0分0秒とする
+			thisTime := time.Date(2020, 1, 4, 5, 0, 0, 0, time.Local)
+			err := s.ExecIfIncompleteThisDay(tc.task, thisTime, func() error {
 				got = tc.task // ExecIfIncompleteThisDayに設定したこの関数が実行されるとtask名でgotを上書きする
 				return nil
 			})
