@@ -63,7 +63,16 @@ func taskStatus(tasks [][]string, task string) (Task, error) {
 		if err != nil {
 			return Task{}, fmt.Errorf("failed to convert %s to int: %v", t[1], err)
 		}
-		return Task{task: t[0], unixtime: int64(u), jst: t[2], turnaround: t[3]}, nil
+
+		var jst, turnaround string
+		if len(t) >= 4 {
+			turnaround = t[3]
+		}
+		if len(t) >= 3 {
+			jst = t[2]
+		}
+
+		return Task{task: t[0], unixtime: int64(u), jst: jst, turnaround: turnaround}, nil
 	}
 	return Task{}, fmt.Errorf("failed to fetch task '%s' from status sheet", task)
 }
