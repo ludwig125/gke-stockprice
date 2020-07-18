@@ -114,24 +114,27 @@ func execDailyProcess(ctx context.Context) error {
 	}
 	log.Println("got sheet service successfully")
 
-	if env == "prod" && os.Getenv("CHECK_HOLIDAY") == "on" {
-		holidaySheet := sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday")
-		isHoli, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
-		if err != nil {
-			// sheetからデータが取れないだけであればエラー出して処理自体は続ける
-			log.Printf("failed to isHoliday: %v", err)
-		} else {
-			// 前の日が祝日だったら起動しないで終わる
-			if err == nil && isHoli {
-				log.Println("previous day is holiday. finish task")
-				return nil
-			}
-			// 前の日が土日だったら起動しないで終わる
-			if isSaturdayOrSunday(time.Now().In(jst).AddDate(0, 0, -1)) {
-				log.Println("previous day is saturday or sunday. finish task")
-				return nil
-			}
-		}
+	var dayoff DayOff
+	if env == "prod" && os.Getenv("CHECK_DAYOFF") == "on" {
+		previousDate := now().AddDate(0, 0, -1)
+		dayoff = isDayOff(previousDate, sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday"))
+		// holidaySheet := sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday")
+		// isHoli, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
+		// if err != nil {
+		// 	// sheetからデータが取れないだけであればエラー出して処理自体は続ける
+		// 	log.Printf("failed to isHoliday: %v", err)
+		// } else {
+		// 	// 前の日が祝日だったら起動しないで終わる
+		// 	if err == nil && isHoli {
+		// 		log.Println("previous day is holiday. finish task")
+		// 		return nil
+		// 	}
+		// 	// 前の日が土日だったら起動しないで終わる
+		// 	if isSaturdayOrSunday(time.Now().In(jst).AddDate(0, 0, -1)) {
+		// 		log.Println("previous day is saturday or sunday. finish task")
+		// 		return nil
+		// 	}
+		// }
 	}
 
 	// 銘柄一覧の取得
@@ -151,6 +154,7 @@ func execDailyProcess(ctx context.Context) error {
 	statusSheet := sheet.NewSpreadSheet(srv, mustGetenv("STATUS_SHEETID"), "status")
 	d := daily{
 		status: statusSheet,
+		dayoff: dayoff,
 		dailyStockPrice: DailyStockPrice{
 			db:                 db,
 			dailyStockpriceURL: mustGetenv("DAILY_PRICE_URL"),                                                          // 日足株価scrape先のURL

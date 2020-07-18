@@ -28,7 +28,7 @@ configMapGenerator:
 - name: send-slack
   literals:
   - flag=off
-- name: check-holiday
+- name: check-dayoff
   literals:
   - flag=off
 - name: scrape-timeout
