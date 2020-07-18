@@ -166,10 +166,10 @@ spec:
                 configMapKeyRef:
                   name: send-slack
                   key: flag
-            - name: CHECK_HOLIDAY
+            - name: CHECK_DAYOFF
               valueFrom:
                 configMapKeyRef:
-                  name: check-holiday
+                  name: check-dayoff
                   key: flag
             volumeMounts:
               - name: serviceaccount-volume

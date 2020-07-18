@@ -13,6 +13,7 @@ import (
 
 type daily struct {
 	status               sheet.Sheet
+	dayoff               DayOff
 	dailyStockPrice      DailyStockPrice
 	calculateMovingAvg   CalculateMovingAvg
 	calculateGrowthTrend CalculateGrowthTrend
@@ -77,6 +78,12 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 
 	// TODO: 最初に取得した株価が全部格納されているか確認したい
 
+	// 前の日が祝日だったら以降の処理はせずに終了する
+	if d.dayoff.dayOff {
+		log.Printf("previous day is dayoff: %s. finish task", d.dayoff.reason)
+		return mergeErr(nil, failedCodes)
+	}
+
 	// この後の処理のために、失敗した銘柄以外を抜き出す。全部失敗して一つも残らなかったらエラーで終了
 	targetCodes := filterSuccessCodes(codes, failedCodes)
 	if len(targetCodes) == 0 {
@@ -104,7 +111,7 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 	return mergeErr(nil, failedCodes)
 }
 
-// 失敗した銘柄をのスライスを返す関数
+// 失敗した銘柄のスライスを返す関数
 func failedCodesSlice(failedCodes FailedCodes) []string {
 	fcodes := make([]string, len(failedCodes))
 	for i, f := range failedCodes {
