@@ -38,10 +38,10 @@ configMapGenerator:
   behavior: replace
   literals:
   - flag=on
-- name: check-holiday
+- name: check-dayoff
   behavior: replace
   literals:
-  - flag=off
+  - flag=on
 - name: scrape-timeout
   behavior: replace
   literals:
