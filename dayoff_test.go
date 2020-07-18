@@ -58,7 +58,7 @@ func TestIsHoliday(t *testing.T) {
 			nil,
 			errors.New("failed to fetch data"),
 			time.Date(2019, 1, 4, 0, 0, 0, 0, time.Local),
-			true,
+			false,
 			errors.New("failed to ReadSheet: failed to fetch data"),
 		},
 		{
@@ -66,7 +66,7 @@ func TestIsHoliday(t *testing.T) {
 			nil,
 			nil,
 			time.Date(2019, 1, 4, 0, 0, 0, 0, time.Local),
-			true,
+			false,
 			errors.New("no data in holidays"),
 		},
 		{
@@ -74,7 +74,7 @@ func TestIsHoliday(t *testing.T) {
 			[][]string{},
 			nil,
 			time.Date(2019, 1, 4, 0, 0, 0, 0, time.Local),
-			true,
+			false,
 			errors.New("no data in holidays"),
 		},
 	}
