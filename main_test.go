@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/pkg/errors"
 	sheets "google.golang.org/api/sheets/v4"
 )
 
@@ -93,5 +94,51 @@ func TestFetchCompanyCode(t *testing.T) {
 	want := []string{"100", "101", "102", "103", "104", "105", "106", "107"}
 	if !reflect.DeepEqual(codes, want) {
 		t.Errorf("got %v, want %v", codes, want)
+	}
+}
+
+func TestReceivePanic(t *testing.T) {
+	tests := map[string]struct {
+		fn         func() error
+		wantErrMsg string
+	}{
+		"no_error": {
+			fn: func() error {
+				return nil
+			},
+			wantErrMsg: "",
+		},
+		"normanl_error": {
+			fn: func() error {
+				return errors.New("this is error")
+			},
+			wantErrMsg: "this is error",
+		},
+		"panic": {
+			fn: func() error {
+				panic("panic")
+			},
+			wantErrMsg: "recovered in function : panic",
+		},
+		"out_of_range": {
+			fn: func() error {
+				list := []int{1, 2, 3, 4}
+				list[4] = 5
+				return nil
+			},
+			wantErrMsg: "recovered in function : runtime error: index out of range [4] with length 4",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			gotErr := receivePanic(tc.fn)
+			t.Log(gotErr)
+
+			if gotErr != nil {
+				if gotErr.Error() != tc.wantErrMsg {
+					t.Errorf("got: %v\nwant: %v", gotErr, tc.wantErrMsg)
+				}
+			}
+		})
 	}
 }

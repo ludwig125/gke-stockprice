@@ -12,3 +12,6 @@ growthtrend_targetdate.txt
 dev_sheetid.txt
 google-cloud-sdk
 cloud_sql_proxy
+*credentials*
+trouble.md
+local_kustomize_prod_config.sh
