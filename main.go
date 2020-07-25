@@ -28,7 +28,7 @@ var (
 func getLocation() *time.Location {
 	jst, err := time.LoadLocation("Asia/Tokyo")
 	if err != nil {
-		log.Fatalf("failed to get LoadLocation: %v", err)
+		log.Panicf("failed to get LoadLocation: %v", err)
 	}
 	return jst
 }
@@ -118,23 +118,6 @@ func execDailyProcess(ctx context.Context) error {
 	if env == "prod" && os.Getenv("CHECK_DAYOFF") == "on" {
 		previousDate := now().AddDate(0, 0, -1)
 		dayoff = isDayOff(previousDate, sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday"))
-		// holidaySheet := sheet.NewSpreadSheet(srv, mustGetenv("HOLIDAY_SHEETID"), "holiday")
-		// isHoli, err := isHoliday(holidaySheet, time.Now().In(jst).AddDate(0, 0, -1))
-		// if err != nil {
-		// 	// sheetからデータが取れないだけであればエラー出して処理自体は続ける
-		// 	log.Printf("failed to isHoliday: %v", err)
-		// } else {
-		// 	// 前の日が祝日だったら起動しないで終わる
-		// 	if err == nil && isHoli {
-		// 		log.Println("previous day is holiday. finish task")
-		// 		return nil
-		// 	}
-		// 	// 前の日が土日だったら起動しないで終わる
-		// 	if isSaturdayOrSunday(time.Now().In(jst).AddDate(0, 0, -1)) {
-		// 		log.Println("previous day is saturday or sunday. finish task")
-		// 		return nil
-		// 	}
-		// }
 	}
 
 	// 銘柄一覧の取得
@@ -291,4 +274,16 @@ func fetchCompanyCode(s sheet.Sheet) ([]string, error) {
 		codes = append(codes, c)
 	}
 	return codes, nil
+}
+
+// 引数として与えた関数内でPanicが生じたらrecoverでキャッチしてエラーに書きだす
+func receivePanic(fn func() error) (err error) {
+	// ref. https://blog.golang.org/defer-panic-and-recover
+	// https://yourbasic.org/golang/recover-from-panic/
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("recovered in function : %v", e)
+		}
+	}()
+	return fn()
 }
