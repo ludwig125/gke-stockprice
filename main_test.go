@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -98,45 +99,58 @@ func TestFetchCompanyCode(t *testing.T) {
 }
 
 func TestReceivePanic(t *testing.T) {
+	g := func() error {
+		list := []int{1, 2, 3}
+		list[3] = 5
+		return nil
+	}
+
 	tests := map[string]struct {
-		fn         func() error
-		wantErrMsg string
+		f                 func() error
+		wantErrMsg1stLine string
 	}{
 		"no_error": {
-			fn: func() error {
+			f: func() error {
 				return nil
 			},
-			wantErrMsg: "",
+			wantErrMsg1stLine: "",
 		},
 		"normanl_error": {
-			fn: func() error {
+			f: func() error {
 				return errors.New("this is error")
 			},
-			wantErrMsg: "this is error",
+			wantErrMsg1stLine: "this is error",
 		},
 		"panic": {
-			fn: func() error {
+			f: func() error {
 				panic("panic")
 			},
-			wantErrMsg: "recovered in function : panic",
+			wantErrMsg1stLine: "recovered in function : panic",
 		},
 		"out_of_range": {
-			fn: func() error {
+			f: func() error {
 				list := []int{1, 2, 3, 4}
 				list[4] = 5
 				return nil
 			},
-			wantErrMsg: "recovered in function : runtime error: index out of range [4] with length 4",
+			wantErrMsg1stLine: "recovered in function : runtime error: index out of range [4] with length 4",
+		},
+		"call_ohter_func_out_of_range": {
+			f: func() error {
+				return g()
+			},
+			wantErrMsg1stLine: "recovered in function : runtime error: index out of range [3] with length 3",
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			gotErr := receivePanic(tc.fn)
-			t.Log(gotErr)
+			gotErr := receivePanic(tc.f)
+			t.Logf("error with stack trace: %v", gotErr)
 
 			if gotErr != nil {
-				if gotErr.Error() != tc.wantErrMsg {
-					t.Errorf("got: %v\nwant: %v", gotErr, tc.wantErrMsg)
+				e := strings.Split(gotErr.Error(), "\n")
+				if e[0] != tc.wantErrMsg1stLine { // エラーの１行目だけと比べる(Stacktraceの結果は見ない)
+					t.Errorf("got: %v\nwant: %v", e[0], tc.wantErrMsg1stLine)
 				}
 			}
 		})

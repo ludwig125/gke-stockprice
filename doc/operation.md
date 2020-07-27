@@ -279,10 +279,23 @@ gcloud components update kubectl
 
 - 結構時間がかかる
 
-kubectlが使えるようになるための認証
-
+kubectlが使えるようになるための認証を以下のどちらかでする
+方法１．Webブラウザで認証
 ```
-gcloud auth login
+$ gcloud auth login
+```
+- 上のコマンドを実行するとURLが表示されるので、ブラウザでURLを開くと許可を求められる
+- 許可がすむと認証用の文字列が発行されるのでそれを端末に入力すればできる
+
+方法２．service account jsonファイルで認証
+```
+$ gcloud auth activate-service-account --key-file gke-stockprice-serviceaccount.json
+```
+- GKEなどサーバ用の認証方法
+- 手元にサービスアカウントのJSONファイルがあれば上の方法で認証できる
+
+clusterに接続
+```
 PROJECT_NAME=gke-stockprice
 CLUSTER_NAME=gke-stockprice-cluster-prod
 COMPUTE_ZONE=us-central1-f
