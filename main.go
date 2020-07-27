@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"syscall"
@@ -67,7 +68,9 @@ func main() {
 	result := "finished successfully"
 	emoji := ":sunny:"
 	// 日時バッチ処理
-	if err := execDailyProcess(ctx); err != nil {
+	if err := receivePanic(func() error { // execDailyProcess内でpanicしたら原因をSlackに伝搬する
+		return execDailyProcess(ctx)
+	}); err != nil {
 		log.Println("failed to execDailyProcess:", err)
 		result = err.Error()
 		emoji = ":umbrella:"
@@ -282,7 +285,7 @@ func receivePanic(fn func() error) (err error) {
 	// https://yourbasic.org/golang/recover-from-panic/
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("recovered in function : %v", e)
+			err = fmt.Errorf("recovered in function : %v\nstacktrace: %s", e, string(debug.Stack()))
 		}
 	}()
 	return fn()
