@@ -9,7 +9,7 @@ jobs:
         environment:
           MYSQL_USER: root
           MYSQL_ALLOW_EMPTY_PASSWORD: true
-    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    working_directory: ~/go/src/github.com/ludwig125  # この設定によって、stepsのcheckout時にworking_directory以下にgke-stockpriceリポジトリがgit cloneされる
     #parallelism: 2 # testの並列実行
     environment:
       TZ: Asia/Tokyo # timezoneが合っていないとtestが失敗する
@@ -46,7 +46,7 @@ jobs:
       IMAGE_NAME: gke-stockprice
     docker:
       - image: google/cloud-sdk
-    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    working_directory: ~/go/src/github.com/ludwig125
     steps:
       - checkout
       - setup_remote_docker:
@@ -74,7 +74,7 @@ jobs:
       IMAGE_NAME: gke-nikkei-mock
     docker:
       - image: google/cloud-sdk
-    working_directory: /go/src/github.com/ludwig125/gke-stockprice/nikkei-mock
+    working_directory: ~/go/src/github.com/ludwig125/nikkei-mock
     steps:
       - checkout
       - setup_remote_docker:
@@ -99,7 +99,7 @@ jobs:
   integration-test:
     docker:
       - image: google/cloud-sdk
-    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    working_directory: ~/go/src/github.com/ludwig125
     environment:
       TZ: Asia/Tokyo # timezoneが合っていないとtestが失敗する
       GO_VERSION: 1.14.1
@@ -209,7 +209,7 @@ jobs:
           command: gcloud container clusters list
 
   deploy_gke_stockprice:
-    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    working_directory: ~/go/src/github.com/ludwig125
     environment:
       PROJECT_NAME: gke-stockprice
       CLUSTER_NAME: gke-stockprice-cluster-prod
@@ -253,7 +253,7 @@ jobs:
           command: ./kustomize build ./k8s/overlays/prod/ | kubectl apply -f -
 
   delete_gke_cluster:
-    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    working_directory: ~/go/src/github.com/ludwig125
     environment:
       PROJECT_NAME: gke-stockprice
       CLUSTER_NAME: gke-stockprice-cluster-prod
@@ -298,7 +298,7 @@ jobs:
           command: gcloud container clusters list
 
   list_gke_cluster:
-    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    working_directory: ~/go/src/github.com/ludwig125
     environment:
       PROJECT_NAME: gke-stockprice
       CLUSTER_NAME: gke-stockprice-cluster-prod
