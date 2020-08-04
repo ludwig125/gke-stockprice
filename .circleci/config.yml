@@ -148,7 +148,7 @@ jobs:
             SHEET_CREDENTIAL=gke-stockprice-serviceaccount.json INTEGRATION_TEST_SHEETID=$INTEGRATION_TEST_SHEETID go test -v ./... -tags integration -run=TestGKEStockPrice -timeout 30m
 
   create_gke_cluster:
-    working_directory: /go/src/github.com/ludwig125/gke-stockprice
+    working_directory: ~/go/src/github.com/ludwig125 # この設定によって、stepsのcheckout時にworking_directory以下にgke-stockpriceリポジトリがgit cloneされる
     environment:
       PROJECT_NAME: gke-stockprice
       CLOUDSQL_INSTANCE: gke-stockprice-cloudsql-prod
