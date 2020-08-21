@@ -24,6 +24,7 @@ func GetSheetClient(ctx context.Context, sheetCredential string) (*sheets.Servic
 	// spreadsheets clientを取得
 	// TODO: deprecatedなので直す
 	// https://godoc.org/google.golang.org/api/sheets/v4#New
+	// > Deprecated: please use NewService instead. To provide a custom HTTP client, use option.WithHTTPClient. If you are using google.golang.org/api/googleapis/transport.APIKey, use option.WithAPIKey with NewService instead.
 	srv, err := sheets.New(client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve Sheets Client: %v", err)
