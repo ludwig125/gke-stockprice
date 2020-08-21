@@ -246,10 +246,10 @@ mysql>
 
 # circleciのジョブをAPIから実行
 
-CIRCLE_API_USER_TOKENを事前に環境変数に設定して以下のコマンドを実行
+CIRCLE_API_USER_TOKENを事前に環境変数に設定してからcurlを実行する
 
 ```bash
-$ curl -XPOST https://circleci.com/api/v1.1/project/github/ludwig125/gke-stockprice/tree/master --user "${CIRCLE_API_USER_TOKEN}:" --header "Content-Type: application/json" -d '{
+$ CIRCLE_API_USER_TOKEN=$(cat circleci_token.txt); curl -XPOST https://circleci.com/api/v1.1/project/github/ludwig125/gke-stockprice/tree/master --user "${CIRCLE_API_USER_TOKEN}:" --header "Content-Type: application/json" -d '{
   "build_parameters": {
     "CIRCLE_JOB": "create_gke_cluster"
   }

@@ -130,7 +130,6 @@ func (sp DailyStockPrice) insertCodePricesToDB(csp CodePrices) error {
 	for _, p := range csp.prices {
 		codePrices = append(codePrices, []string{csp.code, p.date, p.open, p.high, p.low, p.close, p.turnover, p.modified})
 	}
-	//log.Println("stockprice:", codePrices)
 	return sp.db.InsertDB("daily", codePrices)
 }
 
@@ -191,7 +190,6 @@ func (sp DailyStockPrice) scrape(ctx context.Context, code string, currentTime t
 			turnover: prices[4],
 			modified: prices[5],
 		}
-		//log.Println("stockprice", p)
 		datePrices = append(datePrices, p)
 	})
 	if datePrices == nil {
@@ -233,7 +231,6 @@ func (sp DailyStockPrice) fetch(ctx context.Context, code string) (*goquery.Docu
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		//io.Copy(ioutil.Discard, resp.Body)
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read response: %v", err)

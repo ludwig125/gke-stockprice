@@ -18,9 +18,7 @@ type Result struct {
 
 // Exec execute external command without waiting.
 func Exec(c string) (chan Result, error) {
-	log.Println("----command----")
-	log.Println(c)
-	log.Println("--------------")
+	log.Println("command:", c)
 	cmd := exec.Command("bash", "-c", c)
 
 	cmdResCh := make(chan Result)
