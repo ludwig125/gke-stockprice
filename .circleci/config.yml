@@ -145,7 +145,7 @@ jobs:
           name: Integration-test
           no_output_timeout: 30m # これを防ぐ：Too long with no output (exceeded 10m0s)
           command: |
-            SHEET_CREDENTIAL=gke-stockprice-serviceaccount.json INTEGRATION_TEST_SHEETID=$INTEGRATION_TEST_SHEETID go test -v ./... -tags integration -run=TestGKEStockPrice -timeout 30m
+            CREDENTIAL_FILEPATH=gke-stockprice-serviceaccount.json INTEGRATION_TEST_SHEETID=$INTEGRATION_TEST_SHEETID go test -v ./... -tags integration -timeout 30m
 
   create_gke_cluster:
     working_directory: ~/go/src/github.com/ludwig125 # この設定によって、stepsのcheckout時にworking_directory以下にgke-stockpriceリポジトリがgit cloneされる

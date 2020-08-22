@@ -16,7 +16,7 @@ func TestSheet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sheetCredential := mustGetenv(t, "SHEET_CREDENTIAL")
+	sheetCredential := mustGetenv(t, "CREDENTIAL_FILEPATH")
 	// spreadsheetのserviceを取得
 	srv, err := sheet.GetSheetClient(ctx, "../"+sheetCredential)
 	if err != nil {
@@ -80,7 +80,7 @@ func mustGetenv(t *testing.T, k string) string {
 // 	ctx, cancel := context.WithCancel(context.Background())
 // 	defer cancel()
 
-// 	sheetCredential := mustGetenv("SHEET_CREDENTIAL")
+// 	sheetCredential := mustGetenv("CREDENTIAL_FILEPATH")
 // 	// spreadsheetのserviceを取得
 // 	srv, err := GetSheetClient(ctx, sheetCredential)
 // 	if err != nil {
@@ -132,7 +132,7 @@ func mustGetenv(t *testing.T, k string) string {
 // 	ctx, cancel := context.WithCancel(context.Background())
 // 	defer cancel()
 
-// 	sheetCredential := mustGetenv("SHEET_CREDENTIAL")
+// 	sheetCredential := mustGetenv("CREDENTIAL_FILEPATH")
 // 	// spreadsheetのserviceを取得
 // 	srv, err := GetSheetClient(ctx, sheetCredential)
 // 	if err != nil {
