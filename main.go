@@ -68,10 +68,10 @@ func main() {
 	result := "finished successfully"
 	emoji := ":sunny:"
 	// 日時バッチ処理
-	if err := receivePanic(func() error { // execDailyProcess内でpanicしたら原因をSlackに伝搬する
-		return execDailyProcess(ctx)
+	if err := receivePanic(func() error { // execProcess内でpanicしたら原因をSlackに伝搬する
+		return execProcess(ctx)
 	}); err != nil {
-		log.Println("failed to execDailyProcess:", err)
+		log.Println("failed to execProcess:", err)
 		result = err.Error()
 		emoji = ":umbrella:"
 		cancel() // 何らかのエラーが発生した場合、他の処理も全てcancelさせる
@@ -101,7 +101,7 @@ func main() {
 	log.Println("process finished successfully")
 }
 
-func execDailyProcess(ctx context.Context) error {
+func execProcess(ctx context.Context) error {
 	// databaseの取得
 	db, err := getDatabase(ctx)
 	if err != nil {
@@ -111,7 +111,7 @@ func execDailyProcess(ctx context.Context) error {
 	log.Println("connected db successfully")
 
 	// spreadsheetのserviceを取得
-	srv, err := getSheetService(ctx, mustGetenv("SHEET_CREDENTIAL"))
+	srv, err := getSheetService(ctx, mustGetenv("CREDENTIAL_FILEPATH"))
 	if err != nil {
 		return fmt.Errorf("failed to getSheetService: %v", err)
 	}
@@ -163,6 +163,7 @@ func execDailyProcess(ctx context.Context) error {
 	}
 
 	// 一週間に一度（土曜日？）はbackup
+	// mysqldump and upload google drive
 
 	return nil
 }

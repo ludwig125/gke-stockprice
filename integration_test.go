@@ -299,7 +299,7 @@ func checkTestDataInDB(ctx context.Context) error {
 
 func checkTestDataInSheet(ctx context.Context) error {
 	// spreadsheetのserviceを取得
-	sheetCredential := mustGetenv("SHEET_CREDENTIAL")
+	sheetCredential := mustGetenv("CREDENTIAL_FILEPATH")
 	srv, err := sheet.GetSheetClient(ctx, sheetCredential)
 	if err != nil {
 		return fmt.Errorf("failed to get sheet service. err: %v", err)
