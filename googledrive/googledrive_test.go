@@ -14,7 +14,7 @@ func TestGoogleDrive(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	driveCredential := mustGetenv(t, "DRIVE_CREDENTIAL")
+	driveCredential := mustGetenv(t, "CREDENTIAL_FILEPATH")
 	srv, err := GetDriveService(ctx, "../"+driveCredential) // rootディレクトリに置いてあるserviceaccountのjsonを使う
 	if err != nil {
 		t.Fatalf("failed to GetDriveService: %v", err)

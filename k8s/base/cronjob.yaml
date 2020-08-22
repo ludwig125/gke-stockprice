@@ -91,7 +91,7 @@ spec:
                 secretKeyRef:
                   name: db-config
                   key: db_password
-            - name: SHEET_CREDENTIAL
+            - name: CREDENTIAL_FILEPATH
               valueFrom:
                 configMapKeyRef:
                   name: sheet-config
