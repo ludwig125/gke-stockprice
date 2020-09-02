@@ -16,6 +16,7 @@ import (
 	sheets "google.golang.org/api/sheets/v4"
 
 	"github.com/ludwig125/gke-stockprice/database"
+	"github.com/ludwig125/gke-stockprice/googledrive"
 	"github.com/ludwig125/gke-stockprice/retry"
 	"github.com/ludwig125/gke-stockprice/sheet"
 )
@@ -162,8 +163,37 @@ func execProcess(ctx context.Context) error {
 		return fmt.Errorf("failed to daily: %v", err)
 	}
 
-	// 一週間に一度（土曜日？）はbackup
-	// mysqldump and upload google drive
+	// 一週間に一度（日曜日）はbackup
+	// mysqldump and upload to google drive
+	driveSrv, err := googledrive.GetDriveService(ctx, mustGetenv("CREDENTIAL_FILEPATH")) // rootディレクトリに置いてあるserviceaccountのjsonを使う
+	if err != nil {
+		return fmt.Errorf("failed to GetDriveService: %v", err)
+	}
+	for _, table := range []string{"daily", "movingavg"} {
+		dumper, err := NewMySQLDumper(driveSrv,
+			DumpConf{
+				DumpExecuteDays:       strToStrSliceSplitedByComma(useEnvOrDefault("DUMP_EXECUTE_DAYS", "Sunday")),
+				FolderName:            mustGetenv("DRIVE_FOLDER_NAME"),
+				PermissionTargetGmail: useEnvOrDefault("DRIVE_PERMISSION_GMAIL", ""),
+				MimeType:              useEnvOrDefault("DRIVE_FILE_MIMETYPE", "text/plain"),
+				DumpTime:              now(),
+				NeedToBackup:          strToInt(useEnvOrDefault("DRIVE_NEED_TO_BACKUP", "3")),
+				DBUser:                mustGetenv("DB_USER"),
+				DBPassword:            mustGetenv("DB_PASSWORD"),
+				Host:                  useEnvOrDefault("DB_HOST", "127.0.0.1"),
+				Port:                  mustGetenv("DB_PORT"),
+				DBName:                mustGetenv("DB_NAME"),
+				TableName:             table,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to %s NewMySQLDumper: %v", table, err)
+		}
+		if err := dumper.MySQLDumpToGoogleDrive(ctx); err != nil {
+			return fmt.Errorf("failed to %s UploadToGoogleDrive: %v", table, err)
+		}
+		log.Printf("mysqldump %s and upload to google drive successfully", table)
+	}
 
 	return nil
 }
@@ -198,6 +228,14 @@ func strToInt(s string) int {
 	return i
 }
 
+func strToStrSliceSplitedByComma(s string) []string {
+	var ss []string
+	for _, v := range strings.Split(s, ",") {
+		ss = append(ss, v)
+	}
+	return ss
+}
+
 func getDSN(usr, pwd, host string) string {
 	cred := strings.TrimRight(usr, "\n")
 	if pwd != "" {
@@ -220,7 +258,7 @@ func getDatabase(ctx context.Context) (database.DB, error) {
 			db, e = database.NewDB(fmt.Sprintf("%s/%s",
 				getDSN(mustGetenv("DB_USER"),
 					mustGetenv("DB_PASSWORD"),
-					"127.0.0.1:3306"),
+					"127.0.0.1:3306"), // TODO: 環境変数から取得する
 				"stockprice")) // TODO: ここもmustGetenv("DB_NAME")にしていいかも
 
 			return e

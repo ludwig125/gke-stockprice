@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ludwig125/gke-stockprice/date"
 	"github.com/ludwig125/gke-stockprice/sheet"
 )
 
@@ -103,7 +104,11 @@ func (s Status) IsTaskDoneAfter(task string, u int64) (bool, error) {
 func (s Status) ExecIfIncompleteThisDay(task string, thisTime time.Time, fn func() error) error {
 	start := time.Now()
 	// thisTimeの日の0時0分0秒より後にtaskが完了したかどうかを確認する
-	ok, err := s.IsTaskDoneAfter(task, getMidnightUnixtime(thisTime))
+	midnight, err := getLocalMidnightUnixTime(thisTime)
+	if err != nil {
+		return fmt.Errorf("failed to getLocalMidnightUnixTime: %v", err)
+	}
+	ok, err := s.IsTaskDoneAfter(task, midnight)
 	if err != nil {
 		return fmt.Errorf("failed to IsTaskDoneAfter: %v", err)
 	}
@@ -123,9 +128,10 @@ func (s Status) ExecIfIncompleteThisDay(task string, thisTime time.Time, fn func
 	return nil
 }
 
-// 与えられた時刻の0時0分0秒のUnixTimeを取得する
-func getMidnightUnixtime(t time.Time) int64 {
-	year, month, day := t.Date()
-	m := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
-	return m.Unix()
+func getLocalMidnightUnixTime(t time.Time) (int64, error) {
+	t, err := date.GetMidnight(t, "Asia/Tokyo")
+	if err != nil {
+		return 0, fmt.Errorf("failed to GetMidnight")
+	}
+	return t.Unix(), nil
 }
