@@ -36,7 +36,10 @@ func TestStatus(t *testing.T) { // Statusの機能全体を通したTest
 	})
 
 	// 2020-01-04の午前0時0分0秒を取得
-	midnight := getMidnightUnixtime(time.Date(2020, 1, 4, 23, 59, 59, 0, time.Local))
+	midnight, err := getLocalMidnightUnixTime(time.Date(2020, 1, 4, 23, 59, 59, 0, time.Local))
+	if err != nil {
+		t.Fatalf("failed to getLocalMidnightUnixTime: %v", err)
+	}
 
 	// 上で入れたtaskのstatusが終了済みかどうかを確認する
 	tests := map[string]struct {
@@ -67,7 +70,7 @@ func TestStatus(t *testing.T) { // Statusの機能全体を通したTest
 				t.Fatalf("failed to IsTaskDoneAfter:%v", err)
 			}
 			if got != tc.want {
-				t.Errorf("got: %v, want: %v", got, tc.want)
+				t.Fatalf("got: %v, want: %v", got, tc.want)
 			}
 		})
 	}
@@ -153,31 +156,4 @@ func mustGetenv(t *testing.T, k string) string {
 		t.Errorf("%s environment variable not set", k)
 	}
 	return v
-}
-
-func TestGetMidnightUnixtime(t *testing.T) {
-	cases := []struct {
-		name      string
-		inputDate time.Time
-		want      int64
-	}{
-		{
-			"2020_7_7_0_0_0",
-			time.Date(2020, 7, 7, 0, 0, 1, 0, time.Local),
-			1594047600,
-		},
-		{
-			"2020_7_7_23_59_59",
-			time.Date(2020, 7, 7, 23, 59, 59, 0, time.Local),
-			1594047600,
-		},
-	}
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			got := getMidnightUnixtime(tt.inputDate)
-			if got != tt.want {
-				t.Errorf("got %v, want %v", got, tt.want)
-			}
-		})
-	}
 }
