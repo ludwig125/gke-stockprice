@@ -35,9 +35,9 @@ func TestGKEStockPrice(t *testing.T) {
 	*/
 
 	instance := gcloud.CloudSQLInstance{
-		Project: "gke-stockprice",
-		// Instance: "gke-stockprice-cloudsql-integration-test-202006260624",
-		Instance:     "gke-stockprice-cloudsql-integration-test-" + time.Now().Format("200601021504"),
+		Project:  "gke-stockprice",
+		Instance: "gke-stockprice-cloudsql-integration-test-202009050702",
+		// Instance:     "gke-stockprice-cloudsql-integration-test-" + time.Now().Format("200601021504"),
 		Tier:         "db-f1-micro",
 		Region:       "us-central1",
 		DatabaseName: "stockprice_dev",
@@ -211,7 +211,7 @@ func deployGKEStockprice(instance gcloud.CloudSQLInstance) error {
 	secretFiles := []gcloud.GKESecretFile{
 		{
 			Filename: "db_connection_name.txt",
-			Content:  "DB_CONNECTION_NAME=" + ist.ConnectionName,
+			Content:  ist.ConnectionName,
 		},
 		{
 			Filename: "daily_price_url.txt",
