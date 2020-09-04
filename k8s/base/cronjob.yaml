@@ -60,6 +60,9 @@ spec:
               requests:
                 cpu: "0.2"
                 memory: 128Mi
+            envFrom:
+            - configMapRef:
+                name: stockprice-configmap
             env:
             - name: ENV_NUMBER
               valueFrom:
@@ -76,11 +79,11 @@ spec:
                 configMapKeyRef:
                   name: env
                   key: environment
-            - name: DB_CONNECTION_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: sql-proxy-config
-                  key: db_connection_name
+            # - name: DB_CONNECTION_NAME
+            #   valueFrom:
+            #     configMapKeyRef:
+            #       name: sql-proxy-config
+            #       key: db_connection_name
             - name: DB_USER
               valueFrom:
                 secretKeyRef:

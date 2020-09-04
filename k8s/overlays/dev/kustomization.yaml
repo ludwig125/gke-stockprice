@@ -16,6 +16,10 @@ patchesStrategicMerge:
 
 
 configMapGenerator:
+- name: stockprice-configmap
+  behavior: create
+  files:
+  - db_connection_name.txt # integration_test内で動的に生成される
 - name: debug-config
   behavior: create
   literals:

@@ -55,18 +55,18 @@ func TestGKEStockPrice(t *testing.T) {
 	defer func() {
 		log.Println("integration test finished")
 	}()
-	defer func() {
-		if err := instance.DeleteInstance(); err != nil {
-			t.Errorf("failed to DeleteInstance: %#v", err)
-		}
-		log.Printf("delete SQL instance %#v successfully", instance)
-	}()
-	defer func() {
-		if err := cluster.DeleteCluster(); err != nil {
-			t.Errorf("failed to DeleteCluster: %#v", err)
-		}
-		log.Printf("delete GKE cluster %#v successfully", cluster.ClusterName)
-	}()
+	// defer func() {
+	// 	if err := instance.DeleteInstance(); err != nil {
+	// 		t.Errorf("failed to DeleteInstance: %#v", err)
+	// 	}
+	// 	log.Printf("delete SQL instance %#v successfully", instance)
+	// }()
+	// defer func() {
+	// 	if err := cluster.DeleteCluster(); err != nil {
+	// 		t.Errorf("failed to DeleteCluster: %#v", err)
+	// 	}
+	// 	log.Printf("delete GKE cluster %#v successfully", cluster.ClusterName)
+	// }()
 
 	// SQLInstance作成、DB作成
 	if err := setupSQLInstance(instance); err != nil {
@@ -211,7 +211,7 @@ func deployGKEStockprice(instance gcloud.CloudSQLInstance) error {
 	secretFiles := []gcloud.GKESecretFile{
 		{
 			Filename: "db_connection_name.txt",
-			Content:  ist.ConnectionName,
+			Content:  "DB_CONNECTION_NAME=" + ist.ConnectionName,
 		},
 		{
 			Filename: "daily_price_url.txt",
