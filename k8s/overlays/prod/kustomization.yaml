@@ -10,10 +10,10 @@ resources:
 - ../../base
 
 configMapGenerator:
-- name: stockprice-configmap
-  behavior: create
-  literals:
-  - DB_CONNECTION_NAME=gke-stockprice:us-central1:gke-stockprice-cloudsql-prod # 事前に作成されているprod用DBのConnectionName
+# - name: stockprice-configmap
+#   behavior: create
+#   literals:
+#   - DB_CONNECTION_NAME=gke-stockprice:us-central1:gke-stockprice-cloudsql-prod # 事前に作成されているprod用DBのConnectionName
 - name: debug-config
   behavior: create
   literals:
