@@ -16,14 +16,14 @@ patchesStrategicMerge:
 
 
 configMapGenerator:
-- name: stockprice-configmap
-  behavior: create
-  files:
-  - DB_CONNECTION_NAME=db_connection_name.txt # integration_test内で動的に生成される
+# - name: stockprice-configmap
+#   behavior: create
+#   files:
+#   - DB_CONNECTION_NAME=db_connection_name.txt # integration_test内で動的に生成される
 - name: debug-config
   behavior: create
   literals:
-  - debug=off
+  - debug=on
 - name: sql-proxy-config
   behavior: create
   # literals:
