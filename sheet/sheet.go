@@ -75,7 +75,7 @@ func (s SpreadSheet) Read() ([][]string, error) {
 	// ref. https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/get
 	resp, err := s.Service.Spreadsheets.Values.Get(s.SpreadsheetID, s.ReadRange).Do()
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve data from sheet: %v", err)
+		return nil, fmt.Errorf("failed to retrieve data from sheet: %v, sheetID: %s, readRange: %s", err, s.SpreadsheetID, s.ReadRange)
 	}
 	status := resp.ServerResponse.HTTPStatusCode
 	if status != 200 {
