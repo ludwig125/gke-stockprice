@@ -5,6 +5,7 @@ package gcloud
 import (
 	"fmt"
 	"log"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -258,4 +259,16 @@ func GKEDeploy(path string) error {
 		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
 	}
 	return nil
+}
+
+// KustomizeEditConfigMap
+func KustomizeEditConfigMap(path string) error {
+	// TODO: そのうちGKESetFilesForDevEnvの代わりにこちらでeditする
+	// 以下のは例
+	// https://stackoverflow.com/questions/56907734/kustomize-configmap-command-what-does-it-do
+	// https://stackoverflow.com/questions/46028707/how-to-change-the-current-dir-in-go/46036376
+	cmd := exec.Command("bash", "-c", "kustomize edit add configmap mnist-map-training --from-literal=trainSteps=200")
+	cmd.Dir = path // kustomize editは対象のパスで実行しないといけないのでディレクトリを変更する
+
+	return cmd.Run()
 }
