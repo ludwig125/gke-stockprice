@@ -60,6 +60,9 @@ spec:
               requests:
                 cpu: "0.2"
                 memory: 128Mi
+            # envFrom:
+            # - configMapRef:
+            #     name: stockprice-configmap
             env:
             - name: ENV_NUMBER
               valueFrom:

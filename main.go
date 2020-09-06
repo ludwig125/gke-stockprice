@@ -86,18 +86,21 @@ func main() {
 			log.Printf("failed to SendMessage: %v", err)
 		}
 	}
-	// // TODO: あとで以下消す
-	// for i := 0; i < 2000; i++ {
-	// 	select {
-	// 	case <-ctx.Done():
-	// 		return
-	// 	default:
-	// 	}
-	// 	if i%10 == 0 {
-	// 		log.Println("sleep 1 sec:", i)
-	// 	}
-	// 	time.Sleep(1 * time.Second)
-	// }
+
+	// DEBUG onの時はしばらく動かす
+	if d := os.Getenv("DEBUG"); d == "on" {
+		for i := 0; i < 300; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			if i%10 == 0 {
+				log.Println("sleep 1 sec:", i)
+			}
+			time.Sleep(1 * time.Second)
+		}
+	}
 
 	log.Println("process finished successfully")
 }
@@ -205,9 +208,9 @@ func mustGetenv(k string) string {
 	}
 	log.Printf("%s environment variable set", k)
 
-	// if d := os.Getenv("DEBUG"); d == "on" {
-	// 	log.Printf("%s: %s", k, v)
-	// }
+	if d := os.Getenv("DEBUG"); d == "on" {
+		log.Printf("%s: %s", k, v)
+	}
 	return v
 }
 
