@@ -16,10 +16,17 @@ patchesStrategicMerge:
 
 
 configMapGenerator:
-# - name: stockprice-configmap
-#   behavior: create
-#   files:
-#   - DB_CONNECTION_NAME=db_connection_name.txt # integration_test内で動的に生成される
+- name: stockprice-configmap
+  behavior: create
+  literals:
+  - MYSQLDUMP_TO_GOOGLEDRIVE=on
+  - DUMP_EXECUTE_DAYS=Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday # 毎日
+  - DRIVE_FOLDER_NAME=gke-stockprice-dump-test
+  - DRIVE_FILE_MIMETYPE=text/plain
+  - DRIVE_NEED_TO_BACKUP=3
+  - DB_HOST=127.0.0.1
+  - DB_PORT=3306
+  - DB_NAME=stockprice_dev
 - name: debug-config
   behavior: create
   literals:
@@ -55,3 +62,7 @@ secretGenerator:
   - companycode_sheetid=dev_sheetid.txt # integration_test前に配置しておく
   - trend_sheetid=dev_sheetid.txt # integration_test前に配置しておく
   - status_sheetid=dev_sheetid.txt # integration_test前に配置しておく
+- name: gmail-config
+  behavior: create
+  files:
+  - gmail=gmail.txt
