@@ -16,6 +16,9 @@ generatorOptions:
 #   - db_connection_name=override.me
 
 configMapGenerator:
+# - name: stockprice-configmap
+#   literals:
+#   - DB_HOST=127.0.0.1
 - name: sheet-config
   literals:
   - sheet-credential-path=/credential/gke-stockprice-serviceaccount.json

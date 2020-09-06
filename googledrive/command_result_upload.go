@@ -14,7 +14,7 @@ import (
 // CommandResultUpload is struct to command result upload.
 type CommandResultUpload struct {
 	Srv      *drive.Service
-	Command  string //
+	Command  string
 	FileInfo FileInfo
 }
 
@@ -31,7 +31,6 @@ func (c CommandResultUpload) Exec(ctx context.Context) error {
 	}()
 
 	if err := UploadFile(c.Srv, stdout, c.FileInfo); err != nil {
-		// if err := UploadFile(c.Srv, stdout, c.fname, c.fdescription, c.mimeType, c.parentID, c.gzipFlg); err != nil {
 		cancel()
 		return fmt.Errorf("failed to UploadFile: %v", err)
 	}

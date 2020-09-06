@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"google.golang.org/api/drive/v3"
 	sheets "google.golang.org/api/sheets/v4"
 
 	"github.com/ludwig125/gke-stockprice/database"
@@ -166,36 +167,14 @@ func execProcess(ctx context.Context) error {
 		return fmt.Errorf("failed to daily: %v", err)
 	}
 
-	// 一週間に一度（日曜日）はbackup
+	// MySQLの中身をGoogleDriveにbackup
 	// mysqldump and upload to google drive
 	driveSrv, err := googledrive.GetDriveService(ctx, mustGetenv("CREDENTIAL_FILEPATH")) // rootディレクトリに置いてあるserviceaccountのjsonを使う
 	if err != nil {
 		return fmt.Errorf("failed to GetDriveService: %v", err)
 	}
-	for _, table := range []string{"daily", "movingavg"} {
-		dumper, err := NewMySQLDumper(driveSrv,
-			DumpConf{
-				DumpExecuteDays:       strToStrSliceSplitedByComma(useEnvOrDefault("DUMP_EXECUTE_DAYS", "Sunday")),
-				FolderName:            mustGetenv("DRIVE_FOLDER_NAME"),
-				PermissionTargetGmail: useEnvOrDefault("DRIVE_PERMISSION_GMAIL", ""),
-				MimeType:              useEnvOrDefault("DRIVE_FILE_MIMETYPE", "text/plain"),
-				DumpTime:              now(),
-				NeedToBackup:          strToInt(useEnvOrDefault("DRIVE_NEED_TO_BACKUP", "3")),
-				DBUser:                mustGetenv("DB_USER"),
-				DBPassword:            mustGetenv("DB_PASSWORD"),
-				Host:                  useEnvOrDefault("DB_HOST", "127.0.0.1"),
-				Port:                  mustGetenv("DB_PORT"),
-				DBName:                mustGetenv("DB_NAME"),
-				TableName:             table,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("failed to %s NewMySQLDumper: %v", table, err)
-		}
-		if err := dumper.MySQLDumpToGoogleDrive(ctx); err != nil {
-			return fmt.Errorf("failed to %s UploadToGoogleDrive: %v", table, err)
-		}
-		log.Printf("mysqldump %s and upload to google drive successfully", table)
+	if err := backupMySQL(ctx, driveSrv); err != nil {
+		return fmt.Errorf("failed to backupMySQL: %v", err)
 	}
 
 	return nil
@@ -319,6 +298,40 @@ func fetchCompanyCode(s sheet.Sheet) ([]string, error) {
 		codes = append(codes, c)
 	}
 	return codes, nil
+}
+
+func backupMySQL(ctx context.Context, driveSrv *drive.Service) error {
+	if d := os.Getenv("MYSQLDUMP_TO_GOOGLEDRIVE"); d != "on" {
+		log.Printf("MYSQLDUMP_TO_GOOGLEDRIVE is not on. no need to backup")
+		return nil
+	}
+
+	for _, table := range []string{"daily", "movingavg"} {
+		dumper, err := NewMySQLDumper(driveSrv,
+			DumpConf{
+				DumpExecuteDays:       strToStrSliceSplitedByComma(useEnvOrDefault("DUMP_EXECUTE_DAYS", "Sunday")),
+				FolderName:            mustGetenv("DRIVE_FOLDER_NAME"),
+				PermissionTargetGmail: useEnvOrDefault("DRIVE_PERMISSION_GMAIL", ""),
+				MimeType:              useEnvOrDefault("DRIVE_FILE_MIMETYPE", "text/plain"),
+				DumpTime:              now(),
+				NeedToBackup:          strToInt(useEnvOrDefault("DRIVE_NEED_TO_BACKUP", "3")),
+				DBUser:                mustGetenv("DB_USER"),
+				DBPassword:            mustGetenv("DB_PASSWORD"),
+				Host:                  useEnvOrDefault("DB_HOST", "127.0.0.1"),
+				Port:                  mustGetenv("DB_PORT"),
+				DBName:                mustGetenv("DB_NAME"),
+				TableName:             table,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to %s NewMySQLDumper: %v", table, err)
+		}
+		if err := dumper.MySQLDumpToGoogleDrive(ctx); err != nil {
+			return fmt.Errorf("failed to %s UploadToGoogleDrive: %v", table, err)
+		}
+		log.Printf("mysqldump %s and upload to google drive successfully", table)
+	}
+	return nil
 }
 
 // 引数として与えた関数内でPanicが生じたらrecoverでキャッチしてエラーに書きだす

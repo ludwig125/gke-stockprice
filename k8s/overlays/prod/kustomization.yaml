@@ -10,10 +10,17 @@ resources:
 - ../../base
 
 configMapGenerator:
-# - name: stockprice-configmap
-#   behavior: create
-#   literals:
-#   - DB_CONNECTION_NAME=gke-stockprice:us-central1:gke-stockprice-cloudsql-prod # 事前に作成されているprod用DBのConnectionName
+- name: stockprice-configmap
+  behavior: create
+  literals:
+  - MYSQLDUMP_TO_GOOGLEDRIVE=on
+  - DUMP_EXECUTE_DAYS=Sunday
+  - DRIVE_FOLDER_NAME=gke-stockprice-dump
+  - DRIVE_FILE_MIMETYPE=text/plain
+  - DRIVE_NEED_TO_BACKUP=7
+  - DB_HOST=127.0.0.1
+  - DB_PORT=3306
+  - DB_NAME=stockprice
 - name: debug-config
   behavior: create
   literals:
@@ -82,5 +89,9 @@ secretGenerator:
   behavior: replace
   files:
   - circleci_token=circleci_token.txt
+- name: gmail-config
+  behavior: create
+  files:
+  - gmail=gmail.txt
 patchesStrategicMerge:
 - patch_cron_schedule.yaml
