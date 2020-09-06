@@ -36,7 +36,7 @@ func TestGKEStockPrice(t *testing.T) {
 
 	instance := gcloud.CloudSQLInstance{
 		Project: "gke-stockprice",
-		// Instance: "gke-stockprice-cloudsql-integration-test-202006260624",
+		// Instance: "gke-stockprice-cloudsql-integration-test-202009060702",
 		Instance:     "gke-stockprice-cloudsql-integration-test-" + time.Now().Format("200601021504"),
 		Tier:         "db-f1-micro",
 		Region:       "us-central1",
@@ -98,14 +98,20 @@ func TestGKEStockPrice(t *testing.T) {
 	// code
 
 	// GKE Nikkei mockデプロイ
-	if err := deployGKENikkeiMock(); err != nil {
-		t.Fatalf("failed to deployGKENikkeiMock: %v", err)
+	if err := gcloud.GKEDeploy("./nikkei_mock/k8s/"); err != nil {
+		t.Fatalf("failed to gcloud.GKEDeploy nikkei_mock: %v", err)
 	}
 
 	// GKE Stockpriceデプロイ
 	// 	kustomize buildの際に、以下の方法でkustomize edit add configmap することで、testサーバをscraping先として設定できそう
 	// https://github.com/kubernetes-sigs/kustomize/blob/master/examples/springboot/README.md#add-configmap-generator
 	// 同様に、cloud sqlのIDもkustomize edit add configmap で設定できそう
+	// if err := editConfigmap("./k8s/overlays/dev/", instance); err != nil {
+	// 	t.Fatalf("failed to editConfigmap: %v", err)
+	// }
+	// if err := gcloud.GKEDeploy("./k8s/overlays/dev/"); err != nil {
+	// 	t.Fatalf("failed to gcloud.GKEDeploy stockprice: %v", err)
+	// }
 	if err := deployGKEStockprice(instance); err != nil {
 		t.Fatalf("failed to deployGKEStockprice: %v", err)
 	}
@@ -177,13 +183,6 @@ func setupGKECluster(cluster gcloud.GKECluster) error {
 		return fmt.Errorf("failed to GetCredentials: %w", err)
 	}
 
-	return nil
-}
-
-func deployGKENikkeiMock() error {
-	if err := gcloud.GKEDeploy("./nikkei_mock/k8s/"); err != nil {
-		return fmt.Errorf("failed to deploy: %#v", err)
-	}
 	return nil
 }
 
