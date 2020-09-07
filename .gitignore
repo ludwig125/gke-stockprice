@@ -14,4 +14,5 @@ google-cloud-sdk
 cloud_sql_proxy
 *credentials*
 trouble.md
+gmail.txt
 local_kustomize_prod_config.sh

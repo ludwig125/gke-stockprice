@@ -52,6 +52,38 @@ func TestStrToInt(t *testing.T) {
 	}
 }
 
+func TestStrToStrSliceSplitedByComma(t *testing.T) {
+	tests := map[string]struct {
+		in   string
+		want []string
+	}{
+		"no_split": {
+			in:   "abc",
+			want: []string{"abc"},
+		},
+		"no_split_with.": {
+			in:   "a.bc",
+			want: []string{"a.bc"},
+		},
+		"splited_by_comma": {
+			in:   "a,bc",
+			want: []string{"a", "bc"},
+		},
+		"splited_by_comma2": {
+			in:   "a,b,c",
+			want: []string{"a", "b", "c"},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := strToStrSliceSplitedByComma(tc.in)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("got: %v, want: %v", got, tc.want)
+			}
+		})
+	}
+}
+
 type CodeSpreadSheetMock struct {
 	Service       *sheets.Service
 	SpreadsheetID string // sheetのID

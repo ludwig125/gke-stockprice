@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"sort"
 
 	"golang.org/x/net/context"
 	"google.golang.org/api/drive/v3"
@@ -301,7 +302,7 @@ func List(srv *drive.Service, cond string) ([]*drive.File, error) {
 	// Fieldsで指定していない項目については、File.Nameのように参照しようとしても空なので注意
 	// Fieldsの項目の定義：https://developers.google.com/drive/api/v3/reference/files
 	listCall := srv.Files.List().
-		Fields("nextPageToken, files(parents, id, name, kind, size, mimeType, lastModifyingUser, modifiedTime, iconLink, owners, folderColorRgb, shared, webViewLink, webContentLink)")
+		Fields("nextPageToken, files(parents, id, name, kind, size, mimeType, lastModifyingUser, createdTime, modifiedTime, iconLink, owners, folderColorRgb, shared, webViewLink, webContentLink)")
 
 	// 検索条件がある場合はそれを指定する
 	// 検索例：https://developers.google.com/drive/api/v3/search-files
@@ -334,4 +335,26 @@ func Delete(srv *drive.Service, ids ...string) error {
 		return errors.New(e)
 	}
 	return nil
+}
+
+// Sort sort drive.File by file field.
+func Sort(srv *drive.Service, fs []*drive.File, field string) ([]*drive.File, error) {
+	switch field {
+	case "name":
+		sort.Slice(fs, func(i, j int) bool {
+			return fs[i].Name < fs[j].Name
+		})
+		return fs, nil
+	case "createdTime":
+		sort.Slice(fs, func(i, j int) bool {
+			return fs[i].CreatedTime < fs[j].CreatedTime
+		})
+		return fs, nil
+	case "modifiedTime":
+		sort.Slice(fs, func(i, j int) bool {
+			return fs[i].ModifiedTime < fs[j].ModifiedTime
+		})
+		return fs, nil
+	}
+	return nil, fmt.Errorf("invalid sort field: %s", field)
 }
