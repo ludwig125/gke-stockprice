@@ -6,8 +6,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
+
+	"google.golang.org/api/drive/v3"
 )
 
 func TestGoogleDrive(t *testing.T) {
@@ -147,6 +150,139 @@ func TestGoogleDrive(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestSort(t *testing.T) {
+	pDriveFiles := func(fs []drive.File) []*drive.File {
+		pfs := make([]*drive.File, len(fs))
+		for i, f := range fs {
+			pfs[i] = pDriveFile(f)
+		}
+		// for i, f := range pfs {
+		// 	fmt.Printf(" %d fs Name: %s\n", i, f.Name)
+		// }
+
+		return pfs
+	}
+
+	driveFilesList := func(fs []*drive.File) string {
+		var s string
+		for _, f := range fs {
+			s += fmt.Sprintf("Name: %s, CreatedTime: %s, ModifiedTime: %s\n", f.Name, f.CreatedTime, f.ModifiedTime)
+		}
+		return s
+	}
+	tests := map[string]struct {
+		files   []*drive.File
+		field   string
+		wants   []*drive.File
+		wantErr bool
+	}{
+		"sort_by_name": {
+			files: pDriveFiles([]drive.File{
+				{Name: "b", CreatedTime: "2020-01-01T00:00:00.003Z", ModifiedTime: "2020-01-01T00:00:00.003Z"},
+				{Name: "d", CreatedTime: "2020-01-01T00:00:00.001Z", ModifiedTime: "2020-01-01T00:00:00.004Z"},
+				{Name: "c", CreatedTime: "2020-01-01T00:00:00.002Z", ModifiedTime: "2020-01-01T00:00:00.002Z"},
+				{Name: "a", CreatedTime: "2020-01-01T00:00:00.004Z", ModifiedTime: "2020-01-01T00:00:00.001Z"},
+			}),
+			field: "name",
+			wants: pDriveFiles([]drive.File{
+				{Name: "a", CreatedTime: "2020-01-01T00:00:00.004Z", ModifiedTime: "2020-01-01T00:00:00.001Z"},
+				{Name: "b", CreatedTime: "2020-01-01T00:00:00.003Z", ModifiedTime: "2020-01-01T00:00:00.003Z"},
+				{Name: "c", CreatedTime: "2020-01-01T00:00:00.002Z", ModifiedTime: "2020-01-01T00:00:00.002Z"},
+				{Name: "d", CreatedTime: "2020-01-01T00:00:00.001Z", ModifiedTime: "2020-01-01T00:00:00.004Z"},
+			}),
+			wantErr: false,
+		},
+		"sort_by_createdTime": {
+			files: pDriveFiles([]drive.File{
+				{Name: "b", CreatedTime: "2020-01-01T00:00:00.003Z", ModifiedTime: "2020-01-01T00:00:00.003Z"},
+				{Name: "d", CreatedTime: "2020-01-01T00:00:00.001Z", ModifiedTime: "2020-01-01T00:00:00.004Z"},
+				{Name: "c", CreatedTime: "2020-01-01T00:00:00.002Z", ModifiedTime: "2020-01-01T00:00:00.002Z"},
+				{Name: "a", CreatedTime: "2020-01-01T00:00:00.004Z", ModifiedTime: "2020-01-01T00:00:00.001Z"},
+			}),
+			field: "createdTime",
+			wants: pDriveFiles([]drive.File{
+				{Name: "d", CreatedTime: "2020-01-01T00:00:00.001Z", ModifiedTime: "2020-01-01T00:00:00.004Z"},
+				{Name: "c", CreatedTime: "2020-01-01T00:00:00.002Z", ModifiedTime: "2020-01-01T00:00:00.002Z"},
+				{Name: "b", CreatedTime: "2020-01-01T00:00:00.003Z", ModifiedTime: "2020-01-01T00:00:00.003Z"},
+				{Name: "a", CreatedTime: "2020-01-01T00:00:00.004Z", ModifiedTime: "2020-01-01T00:00:00.001Z"},
+			}),
+			wantErr: false,
+		},
+		"sort_by_modifiedTime": {
+			files: pDriveFiles([]drive.File{
+				{Name: "b", CreatedTime: "2020-01-01T00:00:00.003Z", ModifiedTime: "2020-01-01T00:00:00.003Z"},
+				{Name: "d", CreatedTime: "2020-01-01T00:00:00.001Z", ModifiedTime: "2020-01-01T00:00:00.004Z"},
+				{Name: "c", CreatedTime: "2020-01-01T00:00:00.002Z", ModifiedTime: "2020-01-01T00:00:00.002Z"},
+				{Name: "a", CreatedTime: "2020-01-01T00:00:00.004Z", ModifiedTime: "2020-01-01T00:00:00.001Z"},
+			}),
+			field: "modifiedTime",
+			wants: pDriveFiles([]drive.File{
+				{Name: "a", CreatedTime: "2020-01-01T00:00:00.004Z", ModifiedTime: "2020-01-01T00:00:00.001Z"},
+				{Name: "c", CreatedTime: "2020-01-01T00:00:00.002Z", ModifiedTime: "2020-01-01T00:00:00.002Z"},
+				{Name: "b", CreatedTime: "2020-01-01T00:00:00.003Z", ModifiedTime: "2020-01-01T00:00:00.003Z"},
+				{Name: "d", CreatedTime: "2020-01-01T00:00:00.001Z", ModifiedTime: "2020-01-01T00:00:00.004Z"},
+			}),
+			wantErr: false,
+		},
+		"invalid_sort": {
+			files: pDriveFiles([]drive.File{
+				{Name: "b", CreatedTime: "2020-01-01T00:00:00.003Z", ModifiedTime: "2020-01-01T00:00:00.003Z"},
+				{Name: "d", CreatedTime: "2020-01-01T00:00:00.001Z", ModifiedTime: "2020-01-01T00:00:00.004Z"},
+				{Name: "c", CreatedTime: "2020-01-01T00:00:00.002Z", ModifiedTime: "2020-01-01T00:00:00.002Z"},
+				{Name: "a", CreatedTime: "2020-01-01T00:00:00.004Z", ModifiedTime: "2020-01-01T00:00:00.001Z"},
+			}),
+			field:   "abc",
+			wants:   []*drive.File{},
+			wantErr: true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			// printDriveFiles(tc.files)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			driveCredential := mustGetenv(t, "CREDENTIAL_FILEPATH")
+			srv, err := GetDriveService(ctx, "../"+driveCredential) // rootディレクトリに置いてあるserviceaccountのjsonを使う
+			if err != nil {
+				t.Fatalf("failed to GetDriveService: %v", err)
+			}
+			got, err := Sort(srv, tc.files, tc.field)
+			if err != nil {
+				if !tc.wantErr {
+					t.Errorf("gotErr %t, wantErr %t", err, tc.wantErr)
+				}
+				return
+			}
+			if !reflect.DeepEqual(got, tc.wants) {
+				// diff := cmp.Diff(driveFilesList(got), driveFilesList(tc.wants))
+				// t.Errorf("got %#v\nwant %#v\n%v", got, tc.wants, diff)
+				t.Errorf("got %#v\nwant %#v", driveFilesList(got), driveFilesList(tc.wants))
+			}
+		})
+	}
+}
+
+func pDriveFiles(fs []drive.File) []*drive.File {
+	pfs := make([]*drive.File, len(fs))
+	for i, f := range fs {
+		pfs[i] = pDriveFile(f)
+	}
+	return pfs
+}
+
+func driveFilesList(fs []*drive.File) string {
+	var s string
+	for _, f := range fs {
+		s += fmt.Sprintf("Name: %s, CreatedTime: %s, ModifiedTime: %s\n", f.Name, f.CreatedTime, f.ModifiedTime)
+	}
+	return s
+}
+
+func pDriveFile(f drive.File) *drive.File {
+	return &f
 }
 
 func mustGetenv(t *testing.T, k string) string {

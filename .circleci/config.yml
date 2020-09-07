@@ -141,6 +141,7 @@ jobs:
           command: |
             echo $GCLOUD_SERVICE_KEY | base64 -di > ./k8s/base/gke-stockprice-serviceaccount.json # integration_test内でkustomize buildするため
             echo -n $INTEGRATION_TEST_SHEETID > k8s/overlays/dev/dev_sheetid.txt
+            echo -n ${GMAIL} > ./k8s/overlays/dev/gmail.txt
       - run:
           name: Integration-test
           no_output_timeout: 30m # これを防ぐ：Too long with no output (exceeded 10m0s)
@@ -242,6 +243,7 @@ jobs:
             echo -n ${SLACK_TOKEN} > ./k8s/overlays/prod/slack_token.txt
             echo -n ${SLACK_CHANNEL} > ./k8s/overlays/prod/slack_channel.txt
             echo -n ${CIRCLE_API_USER_TOKEN} > ./k8s/overlays/prod/circleci_token.txt
+            echo -n ${GMAIL} > ./k8s/overlays/prod/gmail.txt
       - run:
           name: Install kustomize
           # ref. https://github.com/kubernetes-sigs/kustomize/blob/master/docs/INSTALL.md#quickly-curl-the-latest-binary

@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/ludwig125/gke-stockprice/date"
 	"github.com/ludwig125/gke-stockprice/sheet"
 )
 
@@ -27,7 +28,7 @@ func isDayOff(previousDate time.Time, s sheet.Sheet) DayOff {
 		return DayOff{dayOff: true, reason: fmt.Sprintf("%v is holiday", previousDate)}
 	}
 	// 前の日が土日かどうか
-	if isSaturdayOrSunday(previousDate) {
+	if date.IsSaturdayOrSunday(previousDate) {
 		log.Println("previous day is saturday or sunday. finish task")
 		return DayOff{dayOff: true, reason: fmt.Sprintf("%v is saturday or sunday", previousDate)}
 	}
@@ -56,15 +57,4 @@ func isHoliday(s sheet.Sheet, d time.Time) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-// 与えられた日付が土日かどうか判断する
-func isSaturdayOrSunday(d time.Time) bool {
-	day := d.Weekday()
-	log.Printf("requested date: %s, day: %s", d.Format("2006/01/02"), day.String())
-	switch day {
-	case 6, 0: // Saturday, Sunday
-		return true
-	}
-	return false
 }
