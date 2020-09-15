@@ -142,7 +142,7 @@ func (m MySQLDumper) MySQLDumpToGoogleDrive(ctx context.Context) error {
 	}
 	log.Println("tyring to dump and upload")
 	if err := m.upload(ctx, folderID); err != nil {
-		return fmt.Errorf("failed to Exec upload: %v", err)
+		return fmt.Errorf("failed to upload: %v", err)
 	}
 	log.Println("file was uploaded successfully")
 
@@ -231,13 +231,13 @@ func (m MySQLDumper) upload(ctx context.Context, folderID string) error {
 		ParentID:    folderID,
 		Overwrite:   false,
 	}
-	c := googledrive.CommandResultUpload{
-		Srv:      m.Service,
-		Command:  cmd,
-		FileInfo: fi,
+
+	c, err := googledrive.NewCommandResultUpload(m.Service, cmd, fi)
+	if err != nil {
+		return fmt.Errorf("failed to NewCommandResultUpload: %v", err)
 	}
 	if err := c.Exec(ctx); err != nil {
-		return fmt.Errorf("failed to Exec upload: %v", err)
+		return fmt.Errorf("failed to Exec: %v", err)
 	}
 	return nil
 }
