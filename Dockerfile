@@ -25,9 +25,11 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /go/bin/gke-stockprice
 
 # Second step to build minimal image
 #FROM scratch
-FROM golang:1.13-alpine
+FROM golang:1.15.1-alpine
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /go/bin/gke-stockprice /go/bin/gke-stockprice
+# for mysqldump inside gke-stockprice container
+RUN apk add --update --no-cache mysql-client
 # RUN apk add --update --no-cache tzdata && \
 #     cp /usr/share/zoneinfo/Asia/Tokyo /etc/localtime && \
 #     echo "Asia/Tokyo" > /etc/timezone && \
