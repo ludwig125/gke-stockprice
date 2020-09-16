@@ -25,7 +25,7 @@ type DumpConf struct {
 	Host                  string
 	Port                  string
 	DBName                string
-	TableName             string
+	TableNames            []string
 }
 
 // NewMySQLDumper create new MySQLDumper.
@@ -36,10 +36,13 @@ func NewMySQLDumper(srv *drive.Service, c DumpConf) (*MySQLDumper, error) {
 		}
 		return false
 	}
-	for _, s := range []string{c.FolderName, c.Host, c.Port, c.DBName, c.TableName} {
+	for _, s := range []string{c.FolderName, c.Host, c.Port, c.DBName} {
 		if isEmpty(s) {
 			return nil, fmt.Errorf("%s is empty", s)
 		}
+	}
+	if len(c.TableNames) == 0 {
+		return nil, errors.New("tableNames is empty")
 	}
 
 	dumpExecuteDays := []string{"Sunday"}
@@ -70,9 +73,6 @@ func NewMySQLDumper(srv *drive.Service, c DumpConf) (*MySQLDumper, error) {
 	return &MySQLDumper{
 		Service:               srv,
 		DumpExecuteDays:       dumpExecuteDays,
-		BaseFileName:          baseFileName(c.DBName, c.TableName),
-		FileName:              fileName(c.DBName, c.TableName, dumpTime),
-		FileDescription:       fileDescription(c.DBName, c.TableName, dumpTime),
 		FolderName:            c.FolderName,
 		PermissionTargetGmail: permissionTargetGmail,
 		MimeType:              mimeType,
@@ -83,7 +83,7 @@ func NewMySQLDumper(srv *drive.Service, c DumpConf) (*MySQLDumper, error) {
 		Host:                  c.Host,
 		Port:                  c.Port,
 		DBName:                c.DBName,
-		TableName:             c.TableName,
+		TableNames:            c.TableNames,
 	}, nil
 }
 
@@ -91,9 +91,6 @@ func NewMySQLDumper(srv *drive.Service, c DumpConf) (*MySQLDumper, error) {
 type MySQLDumper struct {
 	Service               *drive.Service
 	DumpExecuteDays       []string
-	BaseFileName          string
-	FileName              string
-	FileDescription       string
 	FolderName            string
 	PermissionTargetGmail string
 	MimeType              string
@@ -104,7 +101,7 @@ type MySQLDumper struct {
 	Host                  string
 	Port                  string
 	DBName                string
-	TableName             string
+	TableNames            []string
 }
 
 func baseFileName(dbName, tableName string) string {
@@ -112,7 +109,7 @@ func baseFileName(dbName, tableName string) string {
 }
 
 func fileName(dbName, tableName string, dumpTime time.Time) string {
-	return fmt.Sprintf("%s-dumpdate%s", baseFileName(dbName, tableName), dumpTime.Format("2006-01-02"))
+	return fmt.Sprintf("%s-%s.sql", baseFileName(dbName, tableName), dumpTime.Format("2006-01-02"))
 }
 func fileDescription(dbName, tableName string, dumpTime time.Time) string {
 	return fmt.Sprintf("%s %s dumpdate: %s", dbName, tableName, dumpTime.Format("2006-01-02"))
@@ -125,13 +122,28 @@ func (m MySQLDumper) MySQLDumpToGoogleDrive(ctx context.Context) error {
 		return fmt.Errorf("failed to GetFolderIDOrCreate: %v, folderName(parent folder): %s", err, m.FolderName)
 	}
 
-	lastUpdatedTime, err := m.getLastUpdatedTime(folderID)
+	for _, tableName := range m.TableNames {
+		log.Printf("trying to mysqldump %s & upload", tableName)
+		if err := m.backup(ctx, folderID, tableName); err != nil {
+			return fmt.Errorf("failed to backup: %v", err)
+		}
+
+		if err := m.checkBackup(folderID, tableName); err != nil {
+			return fmt.Errorf("failed to checkBackup: %v", err)
+		}
+		log.Printf("mysqldump %s & upload to google drive successfully", tableName)
+	}
+	return nil
+}
+
+func (m MySQLDumper) backup(ctx context.Context, folderID, tableName string) error {
+	lastUpdatedTime, err := m.getLastUpdatedTime(folderID, tableName)
 	if err != nil {
 		return fmt.Errorf("failed to lastUpdatedTime: %v", err)
 	}
 
-	// 日曜日の場合は無条件でUploadする
-	// 直前の日曜日からこのプログラムが実行されるまでの間に成功していなければUploadする
+	// DumpExecuteDaysで指定された曜日の場合は無条件でUploadする
+	// 直前のDumpExecuteDaysの曜日からこのプログラムが実行されるまでの間に成功していなければUploadする
 	ok, err := m.whetherOrNotUpload(lastUpdatedTime)
 	if err != nil {
 		return fmt.Errorf("failed to whetherOrNotUpload: %v", err)
@@ -141,36 +153,15 @@ func (m MySQLDumper) MySQLDumpToGoogleDrive(ctx context.Context) error {
 		return nil
 	}
 	log.Println("tyring to dump and upload")
-	if err := m.upload(ctx, folderID); err != nil {
+	if err := m.execCmdAndUpload(ctx, folderID, tableName); err != nil {
 		return fmt.Errorf("failed to upload: %v", err)
 	}
 	log.Println("file was uploaded successfully")
-
-	// ファイルがバックアップとして必要な数だけあるか？
-	// バックアップとして必要な数より多ければ、古いファイルを消す
-	log.Println("check required backup file count")
-	driveFiles, err := m.getDriveFiles(folderID)
-	if err != nil {
-		return fmt.Errorf("failed to  getDriveFiles: %v", err)
-	}
-	if len(driveFiles) <= m.NeedToBackup {
-		log.Printf("driveFiles num: %d does not over needToBackup: %d. no need to delete oldest file.", len(driveFiles), m.NeedToBackup)
-		return nil
-	}
-	log.Println("backuped files are bellow")
-	for i, f := range driveFiles {
-		fmt.Printf("[%d] file: %s(%s) modifiedTime: %s", i, f.Name, f.Id, f.ModifiedTime)
-	}
-	if err := m.deleteOldestDriveFile(driveFiles); err != nil {
-		return fmt.Errorf("failed to  deleteOldestDriveFile: %v", err)
-	}
-	log.Println("oldest file was deleted successfully")
-
 	return nil
 }
 
-func (m MySQLDumper) getLastUpdatedTime(folderID string) (time.Time, error) {
-	fileCondition := fmt.Sprintf("name contains '%s' and mimeType = '%s' and '%s' in parents", m.BaseFileName, m.MimeType, folderID)
+func (m MySQLDumper) getLastUpdatedTime(folderID, tableName string) (time.Time, error) {
+	fileCondition := fmt.Sprintf("name contains '%s' and mimeType = '%s' and '%s' in parents", baseFileName(m.DBName, tableName), m.MimeType, folderID)
 	fs, err := googledrive.List(m.Service, fileCondition)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to List file: %v. condition: %s", err, fileCondition)
@@ -220,13 +211,13 @@ func (m MySQLDumper) whetherOrNotUpload(lastUpdated time.Time) (bool, error) {
 	return false, nil
 }
 
-func (m MySQLDumper) upload(ctx context.Context, folderID string) error {
+func (m MySQLDumper) execCmdAndUpload(ctx context.Context, folderID, tableName string) error {
 	// cmd := "mysqldump -u root -p --host 127.0.0.1 --port 3307 stockprice daily"
-	cmd := fmt.Sprintf("mysqldump -u %s --password=%s --host %s --port %s %s %s", m.DBUser, m.DBPassword, m.Host, m.Port, m.DBName, m.TableName)
+	cmd := fmt.Sprintf("mysqldump -u %s --password=%s --host %s --port %s %s %s", m.DBUser, m.DBPassword, m.Host, m.Port, m.DBName, tableName)
 
 	fi := googledrive.FileInfo{
-		Name:        m.FileName,
-		Description: m.FileDescription,
+		Name:        fileName(m.DBName, tableName, m.DumpTime),
+		Description: fileDescription(m.DBName, tableName, m.DumpTime),
 		MimeType:    m.MimeType,
 		ParentID:    folderID,
 		Overwrite:   false,
@@ -242,8 +233,31 @@ func (m MySQLDumper) upload(ctx context.Context, folderID string) error {
 	return nil
 }
 
-func (m MySQLDumper) getDriveFiles(folderID string) ([]*drive.File, error) {
-	fileCondition := fmt.Sprintf("name contains '%s' and mimeType = '%s' and '%s' in parents", m.BaseFileName, m.MimeType, folderID)
+func (m MySQLDumper) checkBackup(folderID, tableName string) error {
+	// ファイルがバックアップとして必要な数だけあるか？
+	// バックアップとして必要な数より多ければ、古いファイルを消す
+	log.Println("check required backup file count")
+	driveFiles, err := m.getDriveFiles(folderID, tableName)
+	if err != nil {
+		return fmt.Errorf("failed to  getDriveFiles: %v", err)
+	}
+	if len(driveFiles) <= m.NeedToBackup {
+		log.Printf("driveFiles num: %d does not over needToBackup: %d. no need to delete oldest file.", len(driveFiles), m.NeedToBackup)
+		return nil
+	}
+	log.Println("backuped files are bellow")
+	for i, f := range driveFiles {
+		fmt.Printf("[%d] file: %s(%s) modifiedTime: %s", i, f.Name, f.Id, f.ModifiedTime)
+	}
+	if err := m.deleteOldestDriveFile(driveFiles); err != nil {
+		return fmt.Errorf("failed to  deleteOldestDriveFile: %v", err)
+	}
+	log.Println("oldest file was deleted successfully")
+	return nil
+}
+
+func (m MySQLDumper) getDriveFiles(folderID, tableName string) ([]*drive.File, error) {
+	fileCondition := fmt.Sprintf("name contains '%s' and mimeType = '%s' and '%s' in parents", baseFileName(m.DBName, tableName), m.MimeType, folderID)
 	fs, err := googledrive.List(m.Service, fileCondition)
 	if err != nil {
 		return nil, fmt.Errorf("failed to List file: %v. condition: %s", err, fileCondition)

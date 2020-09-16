@@ -210,7 +210,7 @@ func strToInt(s string) int {
 	return i
 }
 
-func strToStrSliceSplitedByComma(s string) []string {
+func strToSlice(s string) []string {
 	var ss []string
 	for _, v := range strings.Split(s, ",") {
 		ss = append(ss, v)
@@ -306,30 +306,27 @@ func backupMySQL(ctx context.Context, driveSrv *drive.Service) error {
 		return nil
 	}
 
-	for _, table := range []string{"daily", "movingavg"} {
-		dumper, err := NewMySQLDumper(driveSrv,
-			DumpConf{
-				DumpExecuteDays:       strToStrSliceSplitedByComma(useEnvOrDefault("DUMP_EXECUTE_DAYS", "Sunday")),
-				FolderName:            mustGetenv("DRIVE_FOLDER_NAME"),
-				PermissionTargetGmail: useEnvOrDefault("DRIVE_PERMISSION_GMAIL", ""),
-				MimeType:              useEnvOrDefault("DRIVE_FILE_MIMETYPE", "text/plain"),
-				DumpTime:              now(),
-				NeedToBackup:          strToInt(useEnvOrDefault("DRIVE_NEED_TO_BACKUP", "3")),
-				DBUser:                mustGetenv("DB_USER"),
-				DBPassword:            mustGetenv("DB_PASSWORD"),
-				Host:                  useEnvOrDefault("DB_HOST", "127.0.0.1"),
-				Port:                  mustGetenv("DB_PORT"),
-				DBName:                mustGetenv("DB_NAME"),
-				TableName:             table,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("failed to %s NewMySQLDumper: %v", table, err)
-		}
-		if err := dumper.MySQLDumpToGoogleDrive(ctx); err != nil {
-			return fmt.Errorf("failed to %s UploadToGoogleDrive: %v", table, err)
-		}
-		log.Printf("mysqldump %s and upload to google drive successfully", table)
+	dumper, err := NewMySQLDumper(driveSrv,
+		DumpConf{
+			DumpExecuteDays:       strToSlice(useEnvOrDefault("DUMP_EXECUTE_DAYS", "Sunday")),
+			FolderName:            mustGetenv("DRIVE_FOLDER_NAME"),
+			PermissionTargetGmail: useEnvOrDefault("DRIVE_PERMISSION_GMAIL", ""),
+			MimeType:              useEnvOrDefault("DRIVE_FILE_MIMETYPE", "text/plain"),
+			DumpTime:              now(),
+			NeedToBackup:          strToInt(useEnvOrDefault("DRIVE_NEED_TO_BACKUP", "3")),
+			DBUser:                mustGetenv("DB_USER"),
+			DBPassword:            mustGetenv("DB_PASSWORD"),
+			Host:                  useEnvOrDefault("DB_HOST", "127.0.0.1"),
+			Port:                  mustGetenv("DB_PORT"),
+			DBName:                mustGetenv("DB_NAME"),
+			TableNames:            strToSlice(useEnvOrDefault("DUMP_TARGET_TABLES", "daily,movingavg")),
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to NewMySQLDumper: %v", err)
+	}
+	if err := dumper.MySQLDumpToGoogleDrive(ctx); err != nil {
+		return fmt.Errorf("failed to UploadToGoogleDrive: %v", err)
 	}
 	return nil
 }
