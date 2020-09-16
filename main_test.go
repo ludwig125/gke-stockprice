@@ -52,7 +52,7 @@ func TestStrToInt(t *testing.T) {
 	}
 }
 
-func TestStrToStrSliceSplitedByComma(t *testing.T) {
+func TestStrToSlice(t *testing.T) {
 	tests := map[string]struct {
 		in   string
 		want []string
@@ -76,7 +76,7 @@ func TestStrToStrSliceSplitedByComma(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := strToStrSliceSplitedByComma(tc.in)
+			got := strToSlice(tc.in)
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("got: %v, want: %v", got, tc.want)
 			}

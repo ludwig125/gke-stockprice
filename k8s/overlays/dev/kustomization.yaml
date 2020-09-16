@@ -27,6 +27,7 @@ configMapGenerator:
   - DB_HOST=127.0.0.1
   - DB_PORT=3306
   - DB_NAME=stockprice_dev
+  - DUMP_TARGET_TABLES=daily,movingavg
 - name: debug-config
   behavior: create
   literals:
