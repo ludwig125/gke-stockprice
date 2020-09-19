@@ -150,16 +150,15 @@ func UploadFile(srv *drive.Service, content io.Reader, fi FileInfo) error {
 	// ref. https://pkg.go.dev/google.golang.org/api/googleapi?tab=doc#ProgressUpdater
 	progressUpdater := func(current, total int64) { log.Printf("%dB / %dB total\n", current, total) }
 
-	var uploadedID string
 	log.Println("start upload")
-	if fi.Overwrite {
-		fileID, err := getFileID(srv, fi.Name, fi.MimeType)
-		if err != nil {
-			return fmt.Errorf("failed to getFileID, target file: %s. mimeType: %s, err: %v", fi.Name, fi.MimeType, err)
-		}
-		if fileID == "" {
-			return fmt.Errorf("no target file: %s. mimeType: %s. fileID is empty", fi.Name, fi.MimeType)
-		}
+	fileID, err := getFileID(srv, fi.Name, fi.MimeType)
+	if err != nil {
+		return fmt.Errorf("failed to getFileID, target file: %s. mimeType: %s, err: %v", fi.Name, fi.MimeType, err)
+	}
+
+	// overwriteがtrueでfileIDが空でなければ（すでにあれば）上書きする
+	// そうでないのなら新規作成
+	if fi.Overwrite && fileID != "" {
 		log.Println("overwrite target:", fi.Name, fileID)
 		f := &drive.File{Name: fi.Name, Description: fi.Description, MimeType: fi.MimeType}
 		// Updateメソッドを使うときはAddParentsでparentsを指定しないと以下のエラーになる
@@ -175,25 +174,87 @@ func UploadFile(srv *drive.Service, content io.Reader, fi FileInfo) error {
 		if err != nil {
 			return fmt.Errorf("error occurred in upload(update): %v", err)
 		}
-		uploadedID = r.Id
-	} else {
-		f := &drive.File{Name: fi.Name, Description: fi.Description, MimeType: fi.MimeType}
-		if fi.ParentID != "" {
-			f.Parents = []string{fi.ParentID}
-		}
-		r, err := srv.Files.Create(f).
-			Media(content).
-			ProgressUpdater(progressUpdater).
-			Do()
-		if err != nil {
-			return fmt.Errorf("error occurred in upload(create): %v", err)
-		}
-		uploadedID = r.Id
+		log.Printf("upload(update) Done. ID : %s\n", r.Id)
+		return nil
 	}
-
-	log.Printf("upload Done. ID : %s\n", uploadedID)
+	log.Println("create target:", fi.Name)
+	f := &drive.File{Name: fi.Name, Description: fi.Description, MimeType: fi.MimeType}
+	if fi.ParentID != "" {
+		f.Parents = []string{fi.ParentID}
+	}
+	r, err := srv.Files.Create(f).
+		Media(content).
+		ProgressUpdater(progressUpdater).
+		Do()
+	if err != nil {
+		return fmt.Errorf("error occurred in upload(create): %v", err)
+	}
+	log.Printf("upload(create) Done. ID : %s\n", r.Id)
 	return nil
 }
+
+// // UploadFile uploads file.
+// func UploadFile(srv *drive.Service, content io.Reader, fi FileInfo) error {
+// 	log.Printf("upload target name: %s, mimeType: %s, parentID: %v, overwrite: %v", fi.Name, fi.MimeType, fi.ParentID, fi.Overwrite)
+// 	if fi.MimeType == "application/gzip" { // これをすると一時的にメモリにcontentが全部載るので、リソースを食うはず
+// 		log.Println("mimeType is application/gzip. try to gzip")
+// 		d, err := gzipData(ioReaderToBytes(content))
+// 		if err != nil {
+// 			return fmt.Errorf("failed to gzip: %v", err)
+// 		}
+// 		// []byte からio.Readerに戻す
+// 		content = bytes.NewReader(d)
+// 	} else if fi.MimeType != "text/plain" {
+// 		return fmt.Errorf("invalid mimeType: %s. you can use text/plain or application/gzip", fi.MimeType)
+// 	}
+
+// 	// ref. https://pkg.go.dev/google.golang.org/api/googleapi?tab=doc#ProgressUpdater
+// 	progressUpdater := func(current, total int64) { log.Printf("%dB / %dB total\n", current, total) }
+
+// 	var uploadedID string
+// 	log.Println("start upload")
+// 	if fi.Overwrite {
+// 		fileID, err := getFileID(srv, fi.Name, fi.MimeType)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to getFileID, target file: %s. mimeType: %s, err: %v", fi.Name, fi.MimeType, err)
+// 		}
+// 		if fileID == "" {
+// 			return fmt.Errorf("no target file: %s. mimeType: %s. fileID is empty", fi.Name, fi.MimeType)
+// 		}
+// 		log.Println("overwrite target:", fi.Name, fileID)
+// 		f := &drive.File{Name: fi.Name, Description: fi.Description, MimeType: fi.MimeType}
+// 		// Updateメソッドを使うときはAddParentsでparentsを指定しないと以下のエラーになる
+// 		// googleapi: Error 403: The parents field is not directly writable in update requests. Use the addParents and removeParents parameters instead., fieldNotWritable
+// 		// ref: https://github.com/googleapis/google-api-go-client/blob/a87a0974131ca1aa879e0dd1d89726d577540c28/drive/v3/drive-gen.go#L1335-L1341
+// 		// > Update requests must use the addParents and
+// 		// > removeParents parameters to modify the parents list.
+// 		r, err := srv.Files.Update(fileID, f).
+// 			AddParents(fi.ParentID).
+// 			Media(content).
+// 			ProgressUpdater(progressUpdater).
+// 			Do()
+// 		if err != nil {
+// 			return fmt.Errorf("error occurred in upload(update): %v", err)
+// 		}
+// 		uploadedID = r.Id
+// 	} else {
+// 		f := &drive.File{Name: fi.Name, Description: fi.Description, MimeType: fi.MimeType}
+// 		if fi.ParentID != "" {
+// 			f.Parents = []string{fi.ParentID}
+// 		}
+// 		r, err := srv.Files.Create(f).
+// 			Media(content).
+// 			ProgressUpdater(progressUpdater).
+// 			Do()
+// 		if err != nil {
+// 			return fmt.Errorf("error occurred in upload(create): %v", err)
+// 		}
+// 		uploadedID = r.Id
+// 	}
+
+// 	log.Printf("upload Done. ID : %s\n", uploadedID)
+// 	return nil
+// }
 
 // DownloadFile uploads file.
 func DownloadFile(srv *drive.Service, fileID, mimeType string) (string, error) {
