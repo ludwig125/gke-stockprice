@@ -180,7 +180,11 @@ func (m MySQLDumper) getLastUpdatedTime(folderID, tableName string) (time.Time, 
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parseRFC3339: %v. target ModifiedTime: %v", err, latestModifiedFile.ModifiedTime)
 	}
-	return lastUpdatedTime, nil
+	lastUpdatedTimeJST, err := date.TimeIn(lastUpdatedTime, "Asia/Tokyo")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to TimeIn: %v", err)
+	}
+	return lastUpdatedTimeJST, nil
 }
 
 func (m MySQLDumper) whetherOrNotUpload(lastUpdated time.Time) (bool, error) {

@@ -6,16 +6,16 @@ import (
 	"time"
 )
 
-// // TimeIn returns the time in UTC if the name is "" or "UTC".
-// // It returns the local time if the name is "Local".
-// // Otherwise, the name is taken to be a location name in
-// func TimeIn(t time.Time, name string) (time.Time, error) {
-// 	loc, err := time.LoadLocation(name)
-// 	if err == nil {
-// 		t = t.In(loc)
-// 	}
-// 	return t, err
-// }
+// TimeIn returns the time in UTC if the name is "" or "UTC".
+// It returns the local time if the name is "Local".
+// Otherwise, the name is taken to be a location name in
+func TimeIn(t time.Time, name string) (time.Time, error) {
+	loc, err := time.LoadLocation(name)
+	if err == nil {
+		t = t.In(loc)
+	}
+	return t, err
+}
 
 // GetMidnight returns t's 0 hours 0 minutes 0 seconds just.
 func GetMidnight(t time.Time, name string) (time.Time, error) {
