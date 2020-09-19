@@ -6,6 +6,36 @@ import (
 	"time"
 )
 
+func TestTimeIn(t *testing.T) {
+	loc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Fatalf("failed to LoadLocation: %v", err)
+	}
+	tests := map[string]struct {
+		time time.Time
+		name string
+		want time.Time
+	}{
+		"now_monday_target_sunday": {
+			time: time.Date(2020, 8, 24, 10, 36, 41, 833000000, time.UTC), // UTC
+			name: "Asia/Tokyo",
+			want: time.Date(2020, 8, 24, 19, 36, 41, 833000000, loc), // JST
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := TimeIn(tc.time, tc.name)
+			if err != nil {
+				t.Fatalf("failed to TimeIn: %v", err)
+			}
+			fmt.Println("got", got)
+			if !got.Equal(tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestGetMidnight(t *testing.T) {
 	cases := []struct {
 		name      string
