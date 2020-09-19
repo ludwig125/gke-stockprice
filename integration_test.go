@@ -14,8 +14,10 @@ import (
 	"github.com/ludwig125/gke-stockprice/command"
 	"github.com/ludwig125/gke-stockprice/database"
 	"github.com/ludwig125/gke-stockprice/gcloud"
+	"github.com/ludwig125/gke-stockprice/googledrive"
 	"github.com/ludwig125/gke-stockprice/retry"
 	"github.com/ludwig125/gke-stockprice/sheet"
+	"google.golang.org/api/drive/v3"
 )
 
 func TestGKEStockPrice(t *testing.T) {
@@ -122,12 +124,20 @@ func TestGKEStockPrice(t *testing.T) {
 	if err := checkTestDataInDB(ctx); err != nil {
 		t.Errorf("failed to checkTestDataInDB: %v", err)
 	}
+
+	// spreadsheetのserviceを取得
+	credential := mustGetenv("CREDENTIAL_FILEPATH")
+	sSrv, err := sheet.GetSheetClient(ctx, credential)
+	if err != nil {
+		t.Fatalf("failed to get sheet service. err: %v", err)
+	}
+	log.Println("got sheet service successfully")
+	sheet := sheet.NewSpreadSheet(sSrv, mustGetenv("INTEGRATION_TEST_SHEETID"), "trend")
+
 	// retryしながらSpreadsheetにデータが入るまで待つ
-	if err := checkTestDataInSheet(ctx); err != nil {
+	if err := checkTestDataInSheet(ctx, sheet); err != nil {
 		t.Errorf("failed to checkTestDataInSheet: %v", err)
 	}
-
-	// displaylogs()
 
 	// 成功したら、一旦cronを止めて、
 	// 次は、test用サーバのURLを本物のURLに差し替え（このURLは環境変数から取得する）てデプロイし直す
@@ -136,6 +146,19 @@ func TestGKEStockPrice(t *testing.T) {
 	// 成功してもしなくても、test用GKEクラスタを削除する
 	// 成功してもしなくても、test用CloudSQLを削除(または停止)する
 
+	dSrv, err := googledrive.GetDriveService(ctx, credential) // rootディレクトリに置いてあるserviceaccountのjsonを使う
+	if err != nil {
+		t.Fatalf("failed to GetDriveService: %v", err)
+	}
+
+	folderName := mustGetenv("DRIVE_FOLDER_NAME")
+	permissionTargetGmail := mustGetenv("DRIVE_PERMISSION_GMAIL")
+	fileName := "kubectl_logs"
+	dumpTime := now()
+	// kubectl logsの結果をupload
+	if err := uploadKubectlLog(ctx, dSrv, folderName, permissionTargetGmail, fileName, dumpTime); err != nil {
+		t.Errorf("failed to uploadKubectlLog: %v", err)
+	}
 }
 
 func setupSQLInstance(instance gcloud.CloudSQLInstance) error {
@@ -296,18 +319,9 @@ func checkTestDataInDB(ctx context.Context) error {
 	return nil
 }
 
-func checkTestDataInSheet(ctx context.Context) error {
-	// spreadsheetのserviceを取得
-	sheetCredential := mustGetenv("CREDENTIAL_FILEPATH")
-	srv, err := sheet.GetSheetClient(ctx, sheetCredential)
-	if err != nil {
-		return fmt.Errorf("failed to get sheet service. err: %v", err)
-	}
-	log.Println("got sheet service successfully")
-
+func checkTestDataInSheet(ctx context.Context, sheet sheet.Sheet) error {
 	if err := retry.WithContext(ctx, 20, 3*time.Second, func() error {
-		ts := sheet.NewSpreadSheet(srv, mustGetenv("INTEGRATION_TEST_SHEETID"), "trend")
-		got, err := ts.Read()
+		got, err := sheet.Read()
 		if err != nil {
 			return fmt.Errorf("failed to read sheet: %w", err)
 		}
@@ -333,6 +347,28 @@ func checkTestDataInSheet(ctx context.Context) error {
 	return nil
 }
 
-// func displaylogs() {
+func uploadKubectlLog(ctx context.Context, srv *drive.Service, folderName, permissionTargetGmail, fileName string, dumpTime time.Time) error {
+	// フォルダIDの取得（フォルダがなければ作る）
+	folderID, err := googledrive.GetFolderIDOrCreate(srv, folderName, permissionTargetGmail) // permission共有Gmailを空にするとユーザにはUIから見ることはできないことに注意
+	if err != nil {
+		return fmt.Errorf("failed to GetFolderIDOrCreate: %v, folderName(parent folder): %s", err, folderName)
+	}
 
-// }
+	fi := googledrive.FileInfo{
+		Name:        fileName,
+		Description: fmt.Sprintf("%s dumpdate: %s", fileName, dumpTime.Format("2006-01-02")),
+		MimeType:    "text/plain",
+		ParentID:    folderID,
+		Overwrite:   true,
+	}
+
+	cmd := "kubectl logs $(kubectl get pods | grep stockprice | awk '{print $1}') -c gke-stockprice-container"
+	c, err := googledrive.NewCommandResultUpload(srv, cmd, fi)
+	if err != nil {
+		return fmt.Errorf("failed to NewCommandResultUpload: %v", err)
+	}
+	if err := c.Exec(ctx); err != nil {
+		return fmt.Errorf("failed to Exec: %v", err)
+	}
+	return nil
+}
