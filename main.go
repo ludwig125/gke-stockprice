@@ -185,10 +185,11 @@ func mustGetenv(k string) string {
 	if v == "" {
 		log.Panicf("environment variable '%s' not set", k)
 	}
-	log.Printf("%s environment variable set", k)
 
 	if d := os.Getenv("DEBUG"); d == "on" {
-		log.Printf("%s: %s", k, v)
+		log.Printf("%s environment variable set: '%s'", k, v)
+	} else {
+		log.Printf("%s environment variable set", k)
 	}
 	return v
 }

@@ -217,7 +217,12 @@ func (m MySQLDumper) whetherOrNotUpload(lastUpdated time.Time) (bool, error) {
 
 func (m MySQLDumper) execCmdAndUpload(ctx context.Context, folderID, tableName string) error {
 	// cmd := "mysqldump -u root -p --host 127.0.0.1 --port 3307 stockprice daily"
-	cmd := fmt.Sprintf("mysqldump -u %s --password=%s --host %s --port %s %s %s", m.DBUser, m.DBPassword, m.Host, m.Port, m.DBName, tableName)
+	password := ""
+	// passwordが設定されていればそれを使う
+	if m.DBPassword != "" {
+		password = fmt.Sprintf("--password=%s", m.DBPassword)
+	}
+	cmd := fmt.Sprintf("mysqldump -u %s %s --host %s --port %s %s %s", m.DBUser, password, m.Host, m.Port, m.DBName, tableName)
 
 	fi := googledrive.FileInfo{
 		Name:        fileName(m.DBName, tableName, m.DumpTime),
