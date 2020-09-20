@@ -240,7 +240,7 @@ func getDatabase(ctx context.Context) (database.DB, error) {
 			var e error
 			db, e = database.NewDB(fmt.Sprintf("%s/%s",
 				getDSN(mustGetenv("DB_USER"),
-					mustGetenv("DB_PASSWORD"),
+					useEnvOrDefault("DB_PASSWORD", ""),
 					"127.0.0.1:3306"), // TODO: 環境変数から取得する
 				"stockprice")) // TODO: ここもmustGetenv("DB_NAME")にしていいかも
 
@@ -316,7 +316,7 @@ func backupMySQL(ctx context.Context, driveSrv *drive.Service) error {
 			DumpTime:              now(),
 			NeedToBackup:          strToInt(useEnvOrDefault("DRIVE_NEED_TO_BACKUP", "3")),
 			DBUser:                mustGetenv("DB_USER"),
-			DBPassword:            mustGetenv("DB_PASSWORD"),
+			DBPassword:            useEnvOrDefault("DB_PASSWORD", ""),
 			Host:                  useEnvOrDefault("DB_HOST", "127.0.0.1"),
 			Port:                  mustGetenv("DB_PORT"),
 			DBName:                mustGetenv("DB_NAME"),
