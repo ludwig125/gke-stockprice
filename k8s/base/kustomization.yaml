@@ -50,8 +50,8 @@ secretGenerator:
   - gke-stockprice-serviceaccount.json
 - name: db-config
   literals:
-  - db_username=override.me
-  - db_password=override.me
+  - db_username=root
+  - db_password=
 - name: slack-config
   literals:
   - slack_token=override.me
