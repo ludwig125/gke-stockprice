@@ -98,7 +98,7 @@ func TestGKEStockPrice(t *testing.T) {
 	}
 	// test用databaseとtableの作成
 	// deferによってテスト終了時に削除する
-	_, err := database.SetupTestDB(3307) // 3307 はCloudSQL用のport
+	_, err = database.SetupTestDB(3307) // 3307 はCloudSQL用のport
 	//cleanup, err := database.SetupTestDB(3307) // 3307 はCloudSQL用のport
 	if err != nil {
 		t.Fatalf("failed to SetupTestDB: %v", err)
