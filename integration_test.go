@@ -21,6 +21,14 @@ import (
 )
 
 func TestGKEStockPrice(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	credential := mustGetenv("CREDENTIAL_FILEPATH")
+
+	dSrv, err := googledrive.GetDriveService(ctx, credential) // rootディレクトリに置いてあるserviceaccountのjsonを使う
+	if err != nil {
+		t.Fatalf("failed to GetDriveService: %v", err)
+	}
 
 	// 事前にtest用CloudSQLを作成する
 	// 作成に時間がかかる場合は停止するだけにしておいて、
@@ -64,6 +72,15 @@ func TestGKEStockPrice(t *testing.T) {
 		log.Printf("delete SQL instance %#v successfully", instance)
 	}()
 	defer func() {
+		folderName := mustGetenv("DRIVE_FOLDER_NAME")
+		permissionTargetGmail := mustGetenv("DRIVE_PERMISSION_GMAIL")
+		fileName := "kubectl_logs"
+		dumpTime := now()
+		// kubectl logsの結果をupload
+		if err := uploadKubectlLog(ctx, dSrv, folderName, permissionTargetGmail, fileName, dumpTime); err != nil {
+			t.Errorf("failed to uploadKubectlLog: %v", err)
+		}
+
 		if err := cluster.DeleteCluster(); err != nil {
 			t.Errorf("failed to DeleteCluster: %#v", err)
 		}
@@ -118,15 +135,12 @@ func TestGKEStockPrice(t *testing.T) {
 		t.Fatalf("failed to deployGKEStockprice: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	// retryしながらCloudSQLにデータが入るまで待つ
 	if err := checkTestDataInDB(ctx); err != nil {
 		t.Errorf("failed to checkTestDataInDB: %v", err)
 	}
 
 	// spreadsheetのserviceを取得
-	credential := mustGetenv("CREDENTIAL_FILEPATH")
 	sSrv, err := sheet.GetSheetClient(ctx, credential)
 	if err != nil {
 		t.Fatalf("failed to get sheet service. err: %v", err)
@@ -146,19 +160,6 @@ func TestGKEStockPrice(t *testing.T) {
 	// 成功してもしなくても、test用GKEクラスタを削除する
 	// 成功してもしなくても、test用CloudSQLを削除(または停止)する
 
-	dSrv, err := googledrive.GetDriveService(ctx, credential) // rootディレクトリに置いてあるserviceaccountのjsonを使う
-	if err != nil {
-		t.Fatalf("failed to GetDriveService: %v", err)
-	}
-
-	folderName := mustGetenv("DRIVE_FOLDER_NAME")
-	permissionTargetGmail := mustGetenv("DRIVE_PERMISSION_GMAIL")
-	fileName := "kubectl_logs"
-	dumpTime := now()
-	// kubectl logsの結果をupload
-	if err := uploadKubectlLog(ctx, dSrv, folderName, permissionTargetGmail, fileName, dumpTime); err != nil {
-		t.Errorf("failed to uploadKubectlLog: %v", err)
-	}
 }
 
 func setupSQLInstance(instance gcloud.CloudSQLInstance) error {
