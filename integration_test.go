@@ -15,7 +15,6 @@ import (
 	"github.com/ludwig125/gke-stockprice/database"
 	"github.com/ludwig125/gke-stockprice/file"
 	"github.com/ludwig125/gke-stockprice/gcloud"
-	"github.com/ludwig125/gke-stockprice/gke"
 	"github.com/ludwig125/gke-stockprice/googledrive"
 	"github.com/ludwig125/gke-stockprice/retry"
 	"github.com/ludwig125/gke-stockprice/sheet"
@@ -135,7 +134,7 @@ func TestGKEStockPrice(t *testing.T) {
 	}
 
 	// GKE stockpriceデプロイ
-	if err := gke.GKEDeploy("./k8s/overlays/dev/"); err != nil {
+	if err := gcloud.GKEDeploy("./k8s/overlays/dev/"); err != nil {
 		t.Fatalf("failed to deploy: %#v", err)
 	}
 
