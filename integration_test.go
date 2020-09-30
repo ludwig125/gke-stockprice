@@ -141,7 +141,7 @@ func TestGKEStockPrice(t *testing.T) {
 
 	// GKE Nikkei mockデプロイ
 	if err := gke.GKEDeploy("./nikkei_mock/k8s/"); err != nil {
-		t.Fatalf("failed to gcloud.GKEDeploy nikkei_mock: %v", err)
+		t.Fatalf("failed to gke.GKEDeploy nikkei_mock: %v", err)
 	}
 
 	// kubernetesデプロイ前に必要なファイルを配置
@@ -196,32 +196,6 @@ func setupSQLInstance(instance gcloud.CloudSQLInstance) error {
 	// RUNNABLEかどうか確認する
 	if err := instance.ConfirmCloudSQLInstanceStatus("RUNNABLE"); err != nil {
 		return fmt.Errorf("failed to ConfirmCloudSQLInstanceStatus: %w", err)
-	}
-
-	return nil
-}
-
-func setupGKECluster(cluster gcloud.GKECluster) error {
-	// すでにGKEClusterが存在するかどうか確認
-	clList, err := cluster.ListCluster()
-	if err != nil {
-		return fmt.Errorf("failed to ListCluster: %w", err)
-	}
-
-	// GKEクラスタがないときは作成する
-	if clList == nil {
-		log.Println("GKE cluster does not exists. trying to create...")
-		if cluster.CreateCluster(); err != nil {
-			return fmt.Errorf("failed to CreateCluster: %#v", err)
-		}
-	}
-
-	if err := cluster.ConfirmClusterStatus("RUNNING"); err != nil {
-		return fmt.Errorf("failed to ConfirmClusterStatus: %w", err)
-	}
-
-	if err := cluster.GetCredentials(); err != nil {
-		return fmt.Errorf("failed to GetCredentials: %w", err)
 	}
 
 	return nil
