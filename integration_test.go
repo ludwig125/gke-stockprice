@@ -13,7 +13,9 @@ import (
 
 	"github.com/ludwig125/gke-stockprice/command"
 	"github.com/ludwig125/gke-stockprice/database"
+	"github.com/ludwig125/gke-stockprice/file"
 	"github.com/ludwig125/gke-stockprice/gcloud"
+	"github.com/ludwig125/gke-stockprice/gke"
 	"github.com/ludwig125/gke-stockprice/googledrive"
 	"github.com/ludwig125/gke-stockprice/retry"
 	"github.com/ludwig125/gke-stockprice/sheet"
@@ -93,9 +95,15 @@ func TestGKEStockPrice(t *testing.T) {
 	}
 	log.Printf("created SQL instance %#v and created test database %s successfully", instance, instance.DatabaseName)
 
-	if err := startCloudSQLProxy(instance); err != nil {
-		t.Fatalf("failed to startCloudSQLProxy: %v", err)
+	sqlConnectionName, err := instance.ConnectionName()
+	if err != nil {
+		t.Fatalf("failed to get instance ConnectionName: %v", err)
 	}
+	// cloudSQLにmysqlclientから接続するためにCloudSQLProxyを立ち上げる
+	if err := runCloudSQLProxy(sqlConnectionName); err != nil {
+		t.Fatalf("failed to runCloudSQLProxy: %v", err)
+	}
+
 	// test用databaseとtableの作成
 	// deferによってテスト終了時に削除する
 	_, err = database.SetupTestDB(3307) // 3307 はCloudSQL用のport
@@ -121,18 +129,14 @@ func TestGKEStockPrice(t *testing.T) {
 		t.Fatalf("failed to gcloud.GKEDeploy nikkei_mock: %v", err)
 	}
 
-	// GKE Stockpriceデプロイ
-	// 	kustomize buildの際に、以下の方法でkustomize edit add configmap することで、testサーバをscraping先として設定できそう
-	// https://github.com/kubernetes-sigs/kustomize/blob/master/examples/springboot/README.md#add-configmap-generator
-	// 同様に、cloud sqlのIDもkustomize edit add configmap で設定できそう
-	// if err := editConfigmap("./k8s/overlays/dev/", instance); err != nil {
-	// 	t.Fatalf("failed to editConfigmap: %v", err)
-	// }
-	// if err := gcloud.GKEDeploy("./k8s/overlays/dev/"); err != nil {
-	// 	t.Fatalf("failed to gcloud.GKEDeploy stockprice: %v", err)
-	// }
-	if err := deployGKEStockprice(instance); err != nil {
-		t.Fatalf("failed to deployGKEStockprice: %v", err)
+	// kubernetesデプロイ前に必要なファイルを配置
+	if err := setFiles(sqlConnectionName); err != nil {
+		t.Fatalf("failed to setFiles: %v", err)
+	}
+
+	// GKE stockpriceデプロイ
+	if err := gke.GKEDeploy("./k8s/overlays/dev/"); err != nil {
+		t.Fatalf("failed to deploy: %#v", err)
 	}
 
 	// retryしながらCloudSQLにデータが入るまで待つ
@@ -185,7 +189,7 @@ func setupSQLInstance(instance gcloud.CloudSQLInstance) error {
 }
 
 func setupGKECluster(cluster gcloud.GKECluster) error {
-	// すでにSQLInstanceが存在するかどうか確認
+	// すでにGKEClusterが存在するかどうか確認
 	clList, err := cluster.ListCluster()
 	if err != nil {
 		return fmt.Errorf("failed to ListCluster: %w", err)
@@ -210,52 +214,32 @@ func setupGKECluster(cluster gcloud.GKECluster) error {
 	return nil
 }
 
-func deployGKEStockprice(instance gcloud.CloudSQLInstance) error {
-	fmt.Printf("instance: \n    %#v\n", instance)
-
-	ist, err := instance.DescribeInstance()
-	if err != nil {
-		return fmt.Errorf("failed to DescribeInstance: %v", err)
-	}
-
+func setFiles(connectionName string) error {
 	clusterIP, err := nikkeiMockClusterIP()
 	if err != nil {
 		return fmt.Errorf("failed to nikkeiMockClusterIP: %v", err)
 	}
 
 	// nikkei mockの直近のテストデータをtargetDateとしてGROWTHTREND_TARGETDATEに設定する
+	// テストデータには'5/16'のような形式でしか日付が入っていないので、
+	// いつの年に実行されても正しく起動するようにformatDate関数を使う
 	targetDate, err := formatDate(time.Now(), "5/16") // testdataの最新の日付
 	if err != nil {
 		return fmt.Errorf("failed to formatDate: %v", err)
 	}
 
-	// TODO "secret" じゃなくて普通にConfigでいい気がする
-	// Secretを環境変数として読み込むためにファイルを配置する
-	secretFiles := []gcloud.GKESecretFile{
-		{
-			Filename: "db_connection_name.txt",
-			Content:  ist.ConnectionName,
-		},
-		{
-			Filename: "daily_price_url.txt",
-			Content:  "http://" + clusterIP,
-		},
-		{
-			Filename: "growthtrend_targetdate.txt",
-			Content:  targetDate,
-		},
+	fs := []file.File{
+		{Name: "db_connection_name.txt", Content: connectionName},
+		{Name: "daily_price_url.txt", Content: "http://" + clusterIP},
+		{Name: "growthtrend_targetdate.txt", Content: targetDate},
 	}
 
-	// test用Secretファイルを配置
-	if err := gcloud.GKESetFilesForDevEnv("./k8s/overlays/dev/", secretFiles); err != nil {
-		return fmt.Errorf("failed to GKESetFilesForDevEnv: %#v", err)
-	}
-
-	if err := gcloud.GKEDeploy("./k8s/overlays/dev/"); err != nil {
-		return fmt.Errorf("failed to deploy: %#v", err)
+	if err := file.CreateFiles("k8s/overlays/dev", fs...); err != nil {
+		return fmt.Errorf("failed to CreateFiles: %v", err)
 	}
 	return nil
 }
+
 func nikkeiMockClusterIP() (string, error) {
 	cmd := "kubectl get service gke-nikkei-mock-service -o jsonpath='{.spec.clusterIP}'"
 	res, err := command.ExecAndWait(cmd)
@@ -265,22 +249,18 @@ func nikkeiMockClusterIP() (string, error) {
 	return res.Stdout, nil
 }
 
-func startCloudSQLProxy(instance gcloud.CloudSQLInstance) error {
-	ist, err := instance.DescribeInstance()
-	if err != nil {
-		return fmt.Errorf("failed to DescribeInstance: %#v", err)
-	}
+// cloud sql proxyを起動する
+func runCloudSQLProxy(connectionName string) error {
 	// コマンドの実行を待たないのでチャネルは捨てる
 	// TODO: CommandContextや、Process.Killなどを使ってあとから止められるようにする
 	// https://golang.org/pkg/os/exec/#CommandContext
 	// https://golang.org/pkg/os/#Process.Kill
 	//_, err = command.Exec(fmt.Sprintf("./cloud_sql_proxy -instances=%s=tcp:3307", ist.ConnectionName))
-	_, err = command.Exec(fmt.Sprintf("./cloud_sql_proxy -instances=%s=tcp:3307", ist.ConnectionName))
-	if err != nil {
-		return fmt.Errorf("failed to start cloud_sql_proxy: %v", err)
+	if _, err := command.Exec(fmt.Sprintf("./cloud_sql_proxy -instances=%s=tcp:3307", connectionName)); err != nil {
+		return fmt.Errorf("failed to run cloud_sql_proxy: %v", err)
 	}
 	time.Sleep(3 * time.Second) // cloud_sql_proxyを立ち上げてから接続できるまで若干時差がある
-	log.Println("start cloud_sql_proxy successfully")
+	log.Println("run cloud_sql_proxy successfully")
 	return nil
 }
 

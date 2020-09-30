@@ -240,7 +240,6 @@ func TestSort(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			// printDriveFiles(tc.files)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 

@@ -213,6 +213,15 @@ func (i CloudSQLInstance) DescribeInstance() (*CloudSQLDatabaseInstance, error) 
 	}, nil
 }
 
+// ConnectionName returns sql instance connection name.
+func (i CloudSQLInstance) ConnectionName() (string, error) {
+	ist, err := i.DescribeInstance()
+	if err != nil {
+		return "", fmt.Errorf("failed to DescribeInstance: %#v", err)
+	}
+	return ist.ConnectionName, nil
+}
+
 func (i CloudSQLInstance) ExistCloudSQLInstance() (bool, error) {
 	cmd := "gcloud sql instances list"
 	res, err := command.ExecAndWait(cmd)
