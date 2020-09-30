@@ -216,3 +216,14 @@ func (c Cluster) GetCredentials() error {
 	log.Println("get-credentials successfully")
 	return nil
 }
+
+// GKEDeploy deploys gke.
+func GKEDeploy(path string) error {
+	// path: ex. "./k8s/overlays/dev/"
+	cmd := fmt.Sprintf("./kustomize build %s | /usr/bin/kubectl apply -f -", path)
+	res, err := command.ExecAndWait(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
+	}
+	return nil
+}
