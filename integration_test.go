@@ -15,36 +15,29 @@ import (
 	"github.com/ludwig125/gke-stockprice/database"
 	"github.com/ludwig125/gke-stockprice/file"
 	"github.com/ludwig125/gke-stockprice/gcloud"
+	"github.com/ludwig125/gke-stockprice/gke"
 	"github.com/ludwig125/gke-stockprice/googledrive"
 	"github.com/ludwig125/gke-stockprice/retry"
 	"github.com/ludwig125/gke-stockprice/sheet"
 	"google.golang.org/api/drive/v3"
 )
 
+// テスト終了時に全部消すかどうか
+const deleteAllAtLast = true
+
 func TestGKEStockPrice(t *testing.T) {
+	defer func() {
+		log.Println("integration test finished")
+	}()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	credential := mustGetenv("CREDENTIAL_FILEPATH")
-
 	dSrv, err := googledrive.GetDriveService(ctx, credential) // rootディレクトリに置いてあるserviceaccountのjsonを使う
 	if err != nil {
 		t.Fatalf("failed to GetDriveService: %v", err)
 	}
 
-	// 事前にtest用CloudSQLを作成する
-	// 作成に時間がかかる場合は停止するだけにしておいて、
-	// 現在のステータスを確認後に、開始する
-
-	// TODO: 停止起動はCurlでできるのであとで書き換えてもいい
-	// https://cloud.google.com/sql/docs/mysql/start-stop-restart-instance
-
-	// CloudSQLの起動をステータスから確認する
-	/*example:
-	        $gcloud sql instances list
-	        NAME                     DATABASE_VERSION  LOCATION       TIER         PRIMARY_ADDRESS  PRIVATE_ADDRESS  STATUS
-			gke-stockprice-testdb    MYSQL_5_7         us-central1-c  db-f1-micro  34.66.91.128     -                STOPPED
-	*/
-
+	// SQLInstanceの作成
 	instance := gcloud.CloudSQLInstance{
 		Project: "gke-stockprice",
 		// Instance: "gke-stockprice-cloudsql-integration-test-202009060702",
@@ -54,24 +47,38 @@ func TestGKEStockPrice(t *testing.T) {
 		DatabaseName: "stockprice_dev",
 		ExecCmd:      true, // 実際に作成削除を行う
 	}
-
-	// test用GKEクラスタ
-	cluster := gcloud.GKECluster{
-		Project:     "gke-stockprice",
-		ClusterName: "gke-stockprice-cluster-integration-test",
-		ComputeZone: "us-central1-f",
-		MachineType: "g1-small",
-		ExecCmd:     true, // 実際に作成削除を行う
+	// すでにSQLInstanceが存在するかどうか確認
+	if err := instance.CreateInstanceIfNotExist(); err != nil {
+		t.Fatalf("failed to CreateInstanceIfNotExist: %v", err)
 	}
+	// SQLInstanceの後処理
 	defer func() {
-		log.Println("integration test finished")
-	}()
-	defer func() {
+		if !deleteAllAtLast {
+			log.Printf("don't delete SQL instance %#v", instance)
+			return
+		}
 		if err := instance.DeleteInstance(); err != nil {
-			t.Errorf("failed to DeleteInstance: %#v", err)
+			t.Errorf("failed to DeleteInstance: %v", err)
+			return
 		}
 		log.Printf("delete SQL instance %#v successfully", instance)
 	}()
+
+	// test用GKEクラスタ作成
+	clusterName := "gke-stockprice-cluster-integration-test"
+	computeZone := "us-central1-f"
+	machineType := "g1-small"
+	diskSize := 10
+	numNodes := 4
+	preemptible := "on"
+	cluster, err := gke.NewCluster(clusterName, computeZone, machineType, diskSize, numNodes, preemptible)
+	if err != nil {
+		t.Fatalf("failed to gke.NewCluster: %v", err)
+	}
+	if err := cluster.CreateClusterIfNotExist(); err != nil {
+		t.Fatalf("failed to gke.CreateClusterIfNotExist: %v", err)
+	}
+	// GKE Clusterの後処理
 	defer func() {
 		folderName := mustGetenv("DRIVE_FOLDER_NAME")
 		permissionTargetGmail := mustGetenv("DRIVE_PERMISSION_GMAIL")
@@ -82,17 +89,32 @@ func TestGKEStockPrice(t *testing.T) {
 			t.Errorf("failed to uploadKubectlLog: %v", err)
 		}
 
+		if !deleteAllAtLast {
+			log.Printf("don't delete GKE cluster %v", cluster.ClusterName)
+			return
+		}
 		if err := cluster.DeleteCluster(); err != nil {
 			t.Errorf("failed to DeleteCluster: %#v", err)
+			return
 		}
-		log.Printf("delete GKE cluster %#v successfully", cluster.ClusterName)
+		log.Printf("delete GKE cluster %v successfully", cluster.ClusterName)
 	}()
 
-	// SQLInstance作成、DB作成
-	if err := setupSQLInstance(instance); err != nil {
-		t.Fatalf("failed to setupSQLInstance: %v", err)
+	// SQL instance がRUNNABLEかどうか確認する
+	if err := instance.ConfirmCloudSQLInstanceStatus("RUNNABLE"); err != nil {
+		t.Fatalf("failed to ConfirmCloudSQLInstanceStatus: %v", err)
 	}
 	log.Printf("created SQL instance %#v and created test database %s successfully", instance, instance.DatabaseName)
+
+	// GKE clusterがRUNNINGかどうか確認する
+	if err := cluster.EnsureClusterStatusRunning(); err != nil {
+		t.Fatalf("failed to gke.EnsureClusterStatusRunning: %v", err)
+	}
+	log.Printf("created GKE cluster %#v successfully", cluster)
+	if err := cluster.GetCredentials(); err != nil {
+		t.Fatalf("failed to GetCredentials: %v", err)
+	}
+	log.Println("got GKE clustercredentials successfully")
 
 	sqlConnectionName, err := instance.ConnectionName()
 	if err != nil {
@@ -102,29 +124,23 @@ func TestGKEStockPrice(t *testing.T) {
 	if err := runCloudSQLProxy(sqlConnectionName); err != nil {
 		t.Fatalf("failed to runCloudSQLProxy: %v", err)
 	}
-
 	// test用databaseとtableの作成
 	// deferによってテスト終了時に削除する
-	_, err = database.SetupTestDB(3307) // 3307 はCloudSQL用のport
-	//cleanup, err := database.SetupTestDB(3307) // 3307 はCloudSQL用のport
+	// _, err = database.SetupTestDB(3307) // 3307 はCloudSQL用のport
+	cleanup, err := database.SetupTestDB(3307) // 3307 はCloudSQL用のport
 	if err != nil {
 		t.Fatalf("failed to SetupTestDB: %v", err)
 	}
-	//defer cleanup()
-
-	// GKECluster作成
-	if err := setupGKECluster(cluster); err != nil {
-		t.Fatalf("failed to setupGKECluster: %v", err)
-	}
-	log.Printf("created GKE cluster %#v successfully", cluster)
-
-	// SpreadSheetに必要なデータを入れる
-	// TODO: unit testとかぶっているのであとで直す
-	// holiday
-	// code
+	defer func() {
+		if !deleteAllAtLast {
+			log.Println("don't delete database")
+			return
+		}
+		cleanup()
+	}()
 
 	// GKE Nikkei mockデプロイ
-	if err := gcloud.GKEDeploy("./nikkei_mock/k8s/"); err != nil {
+	if err := gke.GKEDeploy("./nikkei_mock/k8s/"); err != nil {
 		t.Fatalf("failed to gcloud.GKEDeploy nikkei_mock: %v", err)
 	}
 
@@ -134,10 +150,9 @@ func TestGKEStockPrice(t *testing.T) {
 	}
 
 	// GKE stockpriceデプロイ
-	if err := gcloud.GKEDeploy("./k8s/overlays/dev/"); err != nil {
+	if err := gke.GKEDeploy("./k8s/overlays/dev/"); err != nil {
 		t.Fatalf("failed to deploy: %#v", err)
 	}
-
 	// retryしながらCloudSQLにデータが入るまで待つ
 	if err := checkTestDataInDB(ctx); err != nil {
 		t.Errorf("failed to checkTestDataInDB: %v", err)
@@ -162,7 +177,6 @@ func TestGKEStockPrice(t *testing.T) {
 
 	// 成功してもしなくても、test用GKEクラスタを削除する
 	// 成功してもしなくても、test用CloudSQLを削除(または停止)する
-
 }
 
 func setupSQLInstance(instance gcloud.CloudSQLInstance) error {
