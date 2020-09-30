@@ -50,6 +50,25 @@ func (i CloudSQLInstance) CreateInstance() error {
 	return nil
 }
 
+//
+func (i CloudSQLInstance) CreateInstanceIfNotExist() error {
+	// すでにSQLInstanceが存在するかどうか確認
+	ok, err := i.ExistCloudSQLInstance()
+	if err != nil {
+		return fmt.Errorf("failed to ExistCloudSQLInstance: %#v", err)
+	}
+	if !ok {
+		// SQLInstanceがないなら作る
+		log.Println("SQL Instance does not exists. trying to create...")
+		if err := i.CreateInstance(); err != nil {
+			return fmt.Errorf("failed to CreateInstance: %#v", err)
+		}
+	}
+
+	log.Println("SQL Instance already exists")
+	return nil
+}
+
 func (i CloudSQLInstance) DeleteInstance() error {
 	if !strings.Contains(i.Instance, "integration-test") {
 		return fmt.Errorf("instance name should contains 'integration-test'. instance: %s", i.Instance)
