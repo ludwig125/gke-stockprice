@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ludwig125/gke-stockprice/cloudsql"
 	"github.com/ludwig125/gke-stockprice/command"
 	"github.com/ludwig125/gke-stockprice/database"
 	"github.com/ludwig125/gke-stockprice/file"
-	"github.com/ludwig125/gke-stockprice/gcloud"
 	"github.com/ludwig125/gke-stockprice/gke"
 	"github.com/ludwig125/gke-stockprice/googledrive"
 	"github.com/ludwig125/gke-stockprice/retry"
@@ -38,7 +38,7 @@ func TestGKEStockPrice(t *testing.T) {
 	}
 
 	// SQLInstanceの作成
-	instance := gcloud.CloudSQLInstance{
+	instance := cloudsql.CloudSQLInstance{
 		Project: "gke-stockprice",
 		// Instance: "gke-stockprice-cloudsql-integration-test-202009060702",
 		Instance:     "gke-stockprice-cloudsql-integration-test-" + time.Now().Format("200601021504"),
@@ -61,7 +61,8 @@ func TestGKEStockPrice(t *testing.T) {
 			t.Errorf("failed to DeleteInstance: %v", err)
 			return
 		}
-		log.Printf("delete SQL instance %#v successfully", instance)
+		// TODO: 本当に消えているかわからないので別に確認したほうが良さそう
+		// log.Printf("delete SQL instance %#v successfully", instance)
 	}()
 
 	// test用GKEクラスタ作成
@@ -97,7 +98,8 @@ func TestGKEStockPrice(t *testing.T) {
 			t.Errorf("failed to DeleteCluster: %#v", err)
 			return
 		}
-		log.Printf("delete GKE cluster %v successfully", cluster.ClusterName)
+		// TODO: 本当に消えているかわからないので別に確認したほうが良さそう
+		// log.Printf("delete GKE cluster %v successfully", cluster.ClusterName)
 	}()
 
 	// SQL instance がRUNNABLEかどうか確認する
@@ -140,8 +142,8 @@ func TestGKEStockPrice(t *testing.T) {
 	}()
 
 	// GKE Nikkei mockデプロイ
-	if err := gke.GKEDeploy("./nikkei_mock/k8s/"); err != nil {
-		t.Fatalf("failed to gke.GKEDeploy nikkei_mock: %v", err)
+	if err := gke.KustomizeBuildAndDeploy("./nikkei_mock/k8s/"); err != nil {
+		t.Fatalf("failed to KustomizeBuildAndDeploy nikkei_mock: %v", err)
 	}
 
 	// kubernetesデプロイ前に必要なファイルを配置
@@ -150,8 +152,8 @@ func TestGKEStockPrice(t *testing.T) {
 	}
 
 	// GKE stockpriceデプロイ
-	if err := gke.GKEDeploy("./k8s/overlays/dev/"); err != nil {
-		t.Fatalf("failed to deploy: %#v", err)
+	if err := gke.KustomizeBuildAndDeploy("./k8s/overlays/dev/"); err != nil {
+		t.Fatalf("failed to KustomizeBuildAndDeploy: %#v", err)
 	}
 	// retryしながらCloudSQLにデータが入るまで待つ
 	if err := checkTestDataInDB(ctx); err != nil {
@@ -179,7 +181,7 @@ func TestGKEStockPrice(t *testing.T) {
 	// 成功してもしなくても、test用CloudSQLを削除(または停止)する
 }
 
-func setupSQLInstance(instance gcloud.CloudSQLInstance) error {
+func setupSQLInstance(instance cloudsql.CloudSQLInstance) error {
 	// すでにSQLInstanceが存在するかどうか確認
 	ok, err := instance.ExistCloudSQLInstance()
 	if err != nil {
