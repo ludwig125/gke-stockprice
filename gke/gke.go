@@ -90,10 +90,10 @@ func (c Cluster) CreateClusterIfNotExist() error {
 
 // DeleteCluster delete gke cluster.
 func (c Cluster) DeleteCluster() error {
+	log.Printf("trying to delete gke cluster: %s...", c.ClusterName)
 	cmd := c.deleteClusterCommand()
-	res, err := command.ExecAndWait(cmd)
-	if err != nil {
-		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
+	if _, err := command.Exec(cmd); err != nil { // 削除完了を待たない
+		return fmt.Errorf("failed to Exec: %v, cmd: %s", err, cmd)
 	}
 	return nil
 }
@@ -178,18 +178,18 @@ func (c Cluster) EnsureClusterStatusRunning() error {
 	if err := retry.Retry(30, 20*time.Second, func() error {
 		lcs, err := c.ListCluster()
 		if err != nil {
-			return fmt.Errorf("failed to ListCluster: %w", err)
+			return fmt.Errorf("failed to ListCluster: %v", err)
 		}
 		lc, ok := c.extractFromListedCluster(lcs)
 		if !ok { // Clusterがなければエラー
-			return fmt.Errorf("failed to extractFromListedCluster: %w", err)
+			return fmt.Errorf("failed to extractFromListedCluster: %v", err)
 		}
 		if lc.Status != "RUNNING" { // ClusterがRUNNINGでなければエラー
 			return fmt.Errorf("not RUNNING. current status: %s", lc.Status)
 		}
 		return nil
 	}); err != nil {
-		return fmt.Errorf("failed to confirm gke cluster status: %w", err)
+		return fmt.Errorf("failed to confirm gke cluster status: %v", err)
 	}
 	return nil
 }
@@ -217,8 +217,8 @@ func (c Cluster) GetCredentials() error {
 	return nil
 }
 
-// GKEDeploy deploys gke.
-func GKEDeploy(path string) error {
+// KustomizeBuildAndDeploy deploys gke.
+func KustomizeBuildAndDeploy(path string) error {
 	// path: ex. "./k8s/overlays/dev/"
 	cmd := fmt.Sprintf("./kustomize build %s | /usr/bin/kubectl apply -f -", path)
 	res, err := command.ExecAndWait(cmd)
