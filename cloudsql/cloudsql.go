@@ -1,6 +1,6 @@
 // +build integration
 
-package gcloud
+package cloudsql
 
 import (
 	"fmt"
@@ -79,10 +79,10 @@ func (i CloudSQLInstance) DeleteInstance() error {
 		return nil
 	}
 
+	log.Printf("trying to delete sql instance: %s...", i.Instance)
 	cmd := fmt.Sprintf("gcloud sql instances delete %s", i.Instance)
-	res, err := command.ExecAndWait(cmd)
-	if err != nil {
-		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
+	if _, err := command.Exec(cmd); err != nil { // 削除完了を待たない
+		return fmt.Errorf("failed to Exec: %v, cmd: %s", err, cmd)
 	}
 	return nil
 }
