@@ -3,6 +3,7 @@
 package cloudsql
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -16,41 +17,60 @@ import (
 
 // CloudSQLInstance has cloudsql instance information.
 type CloudSQLInstance struct {
-	Project      string
-	Instance     string
-	Tier         string
-	Region       string
-	DatabaseName string
-	ExecCmd      bool
+	Instance string
+	Region   string
+	Tier     string
+	Database string
+}
+
+// NewCloudSQLInstance CloudSQLInstance constructor.
+func NewCloudSQLInstance(instanceName, region, tier, databaseName string) (*CloudSQLInstance, error) {
+	if instanceName == "" {
+		return nil, errors.New("instanceName is empty")
+	}
+	if region == "" {
+		return nil, errors.New("region is empty")
+	}
+	if tier == "" {
+		return nil, errors.New("tier is empty")
+	}
+	if databaseName == "" {
+		return nil, errors.New("databaseName is empty")
+	}
+
+	// 万が一にも本番インスタンスを消してはいけないので冗長なチェックを入れている
+	if !strings.Contains(instanceName, "integration-test") {
+		return nil, fmt.Errorf("instance name should contains 'integration-test'. instance: %s", instanceName)
+	}
+	if strings.Contains(instanceName, "prod") {
+		return nil, fmt.Errorf("instance name should not contains 'prod'. instance: %s", instanceName)
+	}
+	if !strings.Contains(databaseName, "dev") {
+		return nil, fmt.Errorf("databaseName name should contains 'dev'. databaseName: %s", databaseName)
+	}
+
+	return &CloudSQLInstance{
+		Instance: instanceName,
+		Region:   region,
+		Tier:     tier,
+		Database: databaseName,
+	}, nil
 }
 
 func (i CloudSQLInstance) CreateInstance() error {
-	// PROJECT_NAME=gke-stockprice
-	// gcloud config set project $PROJECT_NAME
-
-	// DB_TIER=db-f1-micro
-	// DB_REGION=us-central1
-	// TIME=`date +"%Y%m%d%H%M"`
-	// DB_NAME=$PROJECT_NAME-$DB_REGION-$DB_TIER-$TIME
-
-	if !strings.Contains(i.Instance, "integration-test") {
-		return fmt.Errorf("instance name should contains 'integration-test'. instance: %s", i.Instance)
-	}
-	// コマンドは実行せず条件を満たすかどうかだけ返す
-	if !i.ExecCmd {
-		log.Println("satisfied the condition")
-		return nil
-	}
-
-	cmd := fmt.Sprintf("gcloud sql instances create %s --tier=%s --region=%s --storage-auto-increase --no-backup", i.Instance, i.Tier, i.Region)
-	res, err := command.ExecAndWait(cmd)
+	cmd := i.createInstanceCommand()
+	_, err := command.Exec(cmd) // コマンドの完了を待たないのでSQLInstanceが作成されて稼働中かどうかは保証しない
 	if err != nil {
-		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
+		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s", err, cmd)
 	}
 	return nil
 }
 
-//
+func (i CloudSQLInstance) createInstanceCommand() string {
+	// -quietオプションなくても作るかどうかy/nはでないはず
+	return fmt.Sprintf("gcloud sql instances create %s --tier=%s --region=%s --storage-auto-increase --no-backup", i.Instance, i.Tier, i.Region)
+}
+
 func (i CloudSQLInstance) CreateInstanceIfNotExist() error {
 	// すでにSQLInstanceが存在するかどうか確認
 	ok, err := i.ExistCloudSQLInstance()
@@ -70,21 +90,26 @@ func (i CloudSQLInstance) CreateInstanceIfNotExist() error {
 }
 
 func (i CloudSQLInstance) DeleteInstance() error {
-	if !strings.Contains(i.Instance, "integration-test") {
-		return fmt.Errorf("instance name should contains 'integration-test'. instance: %s", i.Instance)
-	}
-	// コマンドは実行せず条件を満たすかどうかだけ返す
-	if !i.ExecCmd {
-		log.Println("satisfied the condition")
-		return nil
-	}
-
 	log.Printf("trying to delete sql instance: %s...", i.Instance)
-	cmd := fmt.Sprintf("gcloud sql instances delete %s", i.Instance)
+	cmd, err := i.deleteInstanceCommand()
+	if err != nil {
+		return fmt.Errorf("failed to deleteInstanceCommand: %v", err)
+	}
 	if _, err := command.Exec(cmd); err != nil { // 削除完了を待たない
 		return fmt.Errorf("failed to Exec: %v, cmd: %s", err, cmd)
 	}
 	return nil
+}
+
+func (i CloudSQLInstance) deleteInstanceCommand() (string, error) {
+	if !strings.Contains(i.Instance, "integration-test") {
+		return "", fmt.Errorf("instance name should contains 'integration-test'. instance: %s", i.Instance)
+	}
+	if strings.Contains(i.Instance, "prod") {
+		return "", fmt.Errorf("instance name should not contains 'prod'. instance: %s", i.Instance)
+	}
+	// -quietオプションなくても消すかどうかy/nはでないはず
+	return fmt.Sprintf("gcloud sql instances delete %s", i.Instance), nil
 }
 
 // このAPIはサービスアカウントでは使えない
@@ -183,11 +208,6 @@ func (i CloudSQLInstance) DescribeInstance() (*CloudSQLDatabaseInstance, error) 
 	if !strings.Contains(i.Instance, "integration-test") {
 		return nil, fmt.Errorf("instance name should contains 'integration-test'. instance: %s", i.Instance)
 	}
-	// コマンドは実行せず条件を満たすかどうかだけ返す
-	if !i.ExecCmd {
-		log.Println("satisfied the condition")
-		return nil, nil
-	}
 
 	ok, err := i.ExistCloudSQLInstance()
 	if err != nil {
@@ -276,13 +296,8 @@ func (i CloudSQLInstance) createTestDatabase() error {
 	if !strings.Contains(i.Instance, "integration-test") {
 		return fmt.Errorf("instance name should contains 'integration-test'. instance: %s", i.Instance)
 	}
-	// コマンドは実行せず条件を満たすかどうかだけ返す
-	if !i.ExecCmd {
-		log.Println("satisfied the condition")
-		return nil
-	}
 
-	cmd := fmt.Sprintf("gcloud sql databases create %s --instance=%s", i.DatabaseName, i.Instance)
+	cmd := fmt.Sprintf("gcloud sql databases create %s --instance=%s", i.Database, i.Instance)
 	res, err := command.ExecAndWait(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
@@ -294,11 +309,6 @@ func (i CloudSQLInstance) findDatabase() error {
 	if !strings.Contains(i.Instance, "integration-test") {
 		return fmt.Errorf("instance name should contains 'integration-test'. instance: %s", i.Instance)
 	}
-	// コマンドは実行せず条件を満たすかどうかだけ返す
-	if !i.ExecCmd {
-		log.Println("satisfied the condition")
-		return nil
-	}
 
 	cmd := fmt.Sprintf("gcloud sql databases list --instance=%s", i.Instance)
 	res, err := command.ExecAndWait(cmd)
@@ -307,13 +317,13 @@ func (i CloudSQLInstance) findDatabase() error {
 	}
 	//fmt.Println(res.Stdout)
 
-	if err := findDatabaseName(res.Stdout, i.DatabaseName); err != nil {
+	if err := findDatabase(res.Stdout, i.Database); err != nil {
 		return fmt.Errorf("failed to find test database name. list: %s", res.Stdout)
 	}
 	return nil
 }
 
-func findDatabaseName(s, dbName string) error {
+func findDatabase(s, dbName string) error {
 	lines := strings.Split(s, "\n") // 改行区切りでlinesに格納
 	for _, l := range lines {
 		dbNames := strings.Fields(l)

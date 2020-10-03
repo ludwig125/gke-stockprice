@@ -38,16 +38,16 @@ func TestGKEStockPrice(t *testing.T) {
 	}
 
 	// SQLInstanceの作成
-	instance := cloudsql.CloudSQLInstance{
-		Project: "gke-stockprice",
-		// Instance: "gke-stockprice-cloudsql-integration-test-202009060702",
-		Instance:     "gke-stockprice-cloudsql-integration-test-" + time.Now().Format("200601021504"),
-		Tier:         "db-f1-micro",
-		Region:       "us-central1",
-		DatabaseName: "stockprice_dev",
-		ExecCmd:      true, // 実際に作成削除を行う
+	// instance:= "gke-stockprice-cloudsql-integration-test-202009060702"
+	instanceName := "gke-stockprice-cloudsql-integration-test-" + time.Now().Format("200601021504")
+	region := "us-central1"
+	tier := "db-f1-micro"
+	databaseName := "stockprice_dev"
+	instance, err := cloudsql.NewCloudSQLInstance(instanceName, region, tier, databaseName)
+	if err != nil {
+		t.Fatalf("failed to NewCloudSQLInstance: %v", err)
 	}
-	// すでにSQLInstanceが存在するかどうか確認
+	// すでにSQLInstanceが存在するかどうか確認してなければ作る
 	if err := instance.CreateInstanceIfNotExist(); err != nil {
 		t.Fatalf("failed to CreateInstanceIfNotExist: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestGKEStockPrice(t *testing.T) {
 	if err := instance.ConfirmCloudSQLInstanceStatus("RUNNABLE"); err != nil {
 		t.Fatalf("failed to ConfirmCloudSQLInstanceStatus: %v", err)
 	}
-	log.Printf("created SQL instance %#v and created test database %s successfully", instance, instance.DatabaseName)
+	log.Printf("created SQL instance %#v and created test database %s successfully", instance, instance.Database)
 
 	// GKE clusterがRUNNINGかどうか確認する
 	if err := cluster.EnsureClusterStatusRunning(); err != nil {
