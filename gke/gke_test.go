@@ -79,7 +79,7 @@ func TestNewCluster(t *testing.T) {
 			cl, err := NewCluster(tc.clusterName, tc.computeZone, tc.machineType, tc.diskSize, tc.numNodes, tc.preemptible)
 			if err != nil {
 				if !tc.wantErr {
-					t.Errorf("gotErr: %t, wantErr: %t", err, tc.wantErr)
+					t.Errorf("gotErr: %v, wantErr: %v", err, tc.wantErr)
 				}
 				return
 			}
