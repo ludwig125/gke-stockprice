@@ -55,7 +55,7 @@ func NewCluster(clusterName, computeZone, machineType string, diskSize, numNodes
 // CreateCluster creates gke cluster.
 func (c Cluster) CreateCluster() error {
 	cmd := c.createClusterCommand()
-	if _, err := command.Exec(cmd); err != nil {
+	if _, err := command.Exec(cmd); err != nil { // コマンドの完了を待たないのでClusterが作成されて稼働中かどうかは保証しない
 		return fmt.Errorf("failed to Exec: %v, cmd: %s", err, cmd)
 	}
 	return nil
