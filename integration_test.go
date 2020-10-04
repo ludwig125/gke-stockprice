@@ -103,8 +103,8 @@ func TestGKEStockPrice(t *testing.T) {
 	}()
 
 	// SQL instance がRUNNABLEかどうか確認する
-	if err := instance.ConfirmCloudSQLInstanceStatus("RUNNABLE"); err != nil {
-		t.Fatalf("failed to ConfirmCloudSQLInstanceStatus: %v", err)
+	if err := instance.ConfirmCloudSQLInstanceStatusRunnable(); err != nil {
+		t.Fatalf("failed to ConfirmCloudSQLInstanceStatusRunnable: %v", err)
 	}
 	log.Printf("created SQL instance %#v and created test database %s successfully", instance, instance.Database)
 
@@ -179,28 +179,6 @@ func TestGKEStockPrice(t *testing.T) {
 
 	// 成功してもしなくても、test用GKEクラスタを削除する
 	// 成功してもしなくても、test用CloudSQLを削除(または停止)する
-}
-
-func setupSQLInstance(instance cloudsql.CloudSQLInstance) error {
-	// すでにSQLInstanceが存在するかどうか確認
-	ok, err := instance.ExistCloudSQLInstance()
-	if err != nil {
-		return fmt.Errorf("failed to ExistCloudSQLInstance: %#v", err)
-	}
-	if !ok {
-		// SQLInstanceがないなら作る
-		log.Println("SQL Instance does not exists. trying to create...")
-		if err := instance.CreateInstance(); err != nil {
-			return fmt.Errorf("failed to CreateInstance: %#v", err)
-		}
-	}
-
-	// RUNNABLEかどうか確認する
-	if err := instance.ConfirmCloudSQLInstanceStatus("RUNNABLE"); err != nil {
-		return fmt.Errorf("failed to ConfirmCloudSQLInstanceStatus: %w", err)
-	}
-
-	return nil
 }
 
 func setFiles(connectionName string) error {

@@ -55,9 +55,12 @@ func NewCluster(clusterName, computeZone, machineType string, diskSize, numNodes
 // CreateCluster creates gke cluster.
 func (c Cluster) CreateCluster() error {
 	cmd := c.createClusterCommand()
-	if _, err := command.Exec(cmd); err != nil { // コマンドの完了を待たないのでClusterが作成されて稼働中かどうかは保証しない
-		return fmt.Errorf("failed to Exec: %v, cmd: %s", err, cmd)
+	res, err := command.ExecAndWait(cmd) // コマンドの完了を待つ
+	if err != nil {
+		// if _, err := command.Exec(cmd); err != nil { // コマンドの完了を待たないのでClusterが作成されて稼働中かどうかは保証しない
+		return fmt.Errorf("failed to Exec: %v, cmd: %s, res: %#v", err, cmd, res)
 	}
+	log.Printf("CreateCluster result: %#v", res)
 	return nil
 }
 
@@ -66,6 +69,7 @@ func (c Cluster) createClusterCommand() string {
 	if c.Preemptible == "preemptible" {
 		preemptible = "--preemptible"
 	}
+	// 作るかどうかy/n の入力を待たないように-quietオプションつけている
 	return fmt.Sprintf(`gcloud --quiet container clusters create %s --zone %s --machine-type=%s --disk-size %d --num-nodes=%d %s`, c.ClusterName, c.ComputeZone, c.MachineType, c.DiskSize, c.NumNodes, preemptible)
 }
 
@@ -92,9 +96,12 @@ func (c Cluster) CreateClusterIfNotExist() error {
 func (c Cluster) DeleteCluster() error {
 	log.Printf("trying to delete gke cluster: %s...", c.ClusterName)
 	cmd := c.deleteClusterCommand()
-	if _, err := command.Exec(cmd); err != nil { // 削除完了を待たない
+	res, err := command.ExecAndWait(cmd)
+	if err != nil { // 削除完了を待つ
+		// if _, err := command.Exec(cmd); err != nil { // 削除完了を待たない
 		return fmt.Errorf("failed to Exec: %v, cmd: %s", err, cmd)
 	}
+	log.Printf("DeleteCluster result: %#v", res)
 	return nil
 }
 
