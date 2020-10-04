@@ -59,16 +59,18 @@ func NewCloudSQLInstance(instanceName, region, tier, databaseName string) (*Clou
 
 func (i CloudSQLInstance) CreateInstance() error {
 	cmd := i.createInstanceCommand()
-	_, err := command.Exec(cmd) // コマンドの完了を待たないのでSQLInstanceが作成されて稼働中かどうかは保証しない
+	res, err := command.ExecAndWait(cmd) // コマンドの完了を待つ
+	// _, err := command.Exec(cmd) // コマンドの完了を待たないのでSQLInstanceが作成されて稼働中かどうかは保証しない
 	if err != nil {
-		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s", err, cmd)
+		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s,res: %#v", err, cmd, res)
 	}
+	log.Printf("CreateInstance result: %#v", res)
 	return nil
 }
 
 func (i CloudSQLInstance) createInstanceCommand() string {
-	// -quietオプションなくても作るかどうかy/nはでないはず
-	return fmt.Sprintf("gcloud sql instances create %s --tier=%s --region=%s --storage-auto-increase --no-backup", i.Instance, i.Tier, i.Region)
+	// 作るかどうかy/n の入力を待たないように-quietオプションつけている
+	return fmt.Sprintf("gcloud --quiet sql instances create %s --tier=%s --region=%s --storage-auto-increase --no-backup", i.Instance, i.Tier, i.Region)
 }
 
 func (i CloudSQLInstance) CreateInstanceIfNotExist() error {
@@ -95,9 +97,12 @@ func (i CloudSQLInstance) DeleteInstance() error {
 	if err != nil {
 		return fmt.Errorf("failed to deleteInstanceCommand: %v", err)
 	}
-	if _, err := command.Exec(cmd); err != nil { // 削除完了を待たない
-		return fmt.Errorf("failed to Exec: %v, cmd: %s", err, cmd)
+	res, err := command.ExecAndWait(cmd) // 削除完了を待つ
+	if err != nil {
+		// if _, err := command.Exec(cmd); err != nil { // 削除完了を待たない
+		return fmt.Errorf("failed to Exec: %v, cmd: %s, res: %#v", err, cmd, res)
 	}
+	log.Printf("DeleteInstance result: %#v", res)
 	return nil
 }
 
@@ -108,8 +113,7 @@ func (i CloudSQLInstance) deleteInstanceCommand() (string, error) {
 	if strings.Contains(i.Instance, "prod") {
 		return "", fmt.Errorf("instance name should not contains 'prod'. instance: %s", i.Instance)
 	}
-	// -quietオプションなくても消すかどうかy/nはでないはず
-	return fmt.Sprintf("gcloud sql instances delete %s", i.Instance), nil
+	return fmt.Sprintf("gcloud --quiet sql instances delete %s", i.Instance), nil
 }
 
 // このAPIはサービスアカウントでは使えない
@@ -276,12 +280,13 @@ func (i CloudSQLInstance) ExistCloudSQLInstance() (bool, error) {
 	return false, nil
 }
 
-func (i CloudSQLInstance) ConfirmCloudSQLInstanceStatus(wantStatus string) error {
+func (i CloudSQLInstance) ConfirmCloudSQLInstanceStatusRunnable() error {
 	if err := retry.Retry(30, 20*time.Second, func() error {
 		instance, err := i.DescribeInstance()
 		if err != nil {
 			return fmt.Errorf("failed to DescribeInstance: %w", err)
 		}
+		wantStatus := "RUNNABLE"
 		if instance.State != wantStatus {
 			return fmt.Errorf("not matched. current: %s, expected: %s", instance.State, wantStatus)
 		}
