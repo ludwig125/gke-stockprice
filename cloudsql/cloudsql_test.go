@@ -29,7 +29,7 @@ func TestNewCloudSQLInstance(t *testing.T) {
 				Database: "database_dev",
 			},
 			wantErr:       "",
-			wantCreateCmd: `gcloud sql instances create instance1-integration-test --tier=db-f1-micro --region=region1 --storage-auto-increase --no-backup`,
+			wantCreateCmd: `gcloud --quiet sql instances create instance1-integration-test --tier=db-f1-micro --region=region1 --storage-auto-increase --no-backup`,
 		},
 		"error_no_instance": {
 			// instanceName: "instance1-integration-test",
@@ -119,7 +119,7 @@ func TestDeleteInstanceCommand(t *testing.T) {
 				Database: "database_dev",
 			},
 			wantErr:       "",
-			wantDeleteCmd: `gcloud sql instances delete instance1-integration-test`,
+			wantDeleteCmd: `gcloud --quiet sql instances delete instance1-integration-test`,
 		},
 		"error_instance_not_contain_integration-test": {
 			instance: &CloudSQLInstance{
@@ -161,57 +161,58 @@ func TestDeleteInstanceCommand(t *testing.T) {
 	}
 }
 
-func TestDescribeInstance(t *testing.T) {
-	cases := []struct {
-		name       string
-		instance   CloudSQLInstance
-		wantStdout string
-		wantErr    bool
-	}{
-		{
-			name: "match_projectid",
-			instance: CloudSQLInstance{
-				//Instance: "gke-stockprice-integration-test-202003240621",
-				Instance: "gke-stockprice-integration-test",
-				Tier:     "db-f1-micro",
-				Region:   "us-central1",
-			},
-			wantErr: false,
-		},
-		{
-			name: "not_match_projectid",
-			instance: CloudSQLInstance{
-				Instance: "gke-stockprice-integration2-test",
-				Tier:     "db-f1-micro",
-				Region:   "us-central1",
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			i := tt.instance
-			res, err := i.DescribeInstance()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("error: %v, wantErr: %v", err, tt.wantErr)
-				return
-			}
-			t.Log(res)
-		})
-	}
-}
+// TODO: 以下はモックを作ってテストをする
+// // func TestDescribeInstance(t *testing.T) {
+// // 	cases := []struct {
+// // 		name       string
+// // 		instance   CloudSQLInstance
+// // 		wantStdout string
+// // 		wantErr    bool
+// // 	}{
+// // 		{
+// // 			name: "match_projectid",
+// // 			instance: CloudSQLInstance{
+// // 				//Instance: "gke-stockprice-integration-test-202003240621",
+// // 				Instance: "gke-stockprice-integration-test",
+// // 				Tier:     "db-f1-micro",
+// // 				Region:   "us-central1",
+// // 			},
+// // 			wantErr: false,
+// // 		},
+// // 		{
+// // 			name: "not_match_projectid",
+// // 			instance: CloudSQLInstance{
+// // 				Instance: "gke-stockprice-integration2-test",
+// // 				Tier:     "db-f1-micro",
+// // 				Region:   "us-central1",
+// // 			},
+// // 			wantErr: true,
+// // 		},
+// // 	}
+// // 	for _, tt := range cases {
+// // 		t.Run(tt.name, func(t *testing.T) {
+// // 			i := tt.instance
+// // 			res, err := i.DescribeInstance()
+// // 			if (err != nil) != tt.wantErr {
+// // 				t.Errorf("error: %v, wantErr: %v", err, tt.wantErr)
+// // 				return
+// // 			}
+// // 			t.Log(res)
+// // 		})
+// // 	}
+// // }
 
-func TestExistCloudSQLInstance(t *testing.T) {
-	i := CloudSQLInstance{
-		Instance: "gke-stockprice-integration-test-202003240621",
-		Tier:     "db-f1-micro",
-		Region:   "us-central1",
-	}
-	ok, err := i.ExistCloudSQLInstance()
-	wantErr := false
-	if (err != nil) != wantErr {
-		t.Errorf("error: %v, wantErr: %v", err, wantErr)
-		return
-	}
-	t.Log(ok)
-}
+// func TestExistCloudSQLInstance(t *testing.T) {
+// 	i := CloudSQLInstance{
+// 		Instance: "gke-stockprice-integration-test-202003240621",
+// 		Tier:     "db-f1-micro",
+// 		Region:   "us-central1",
+// 	}
+// 	ok, err := i.ExistCloudSQLInstance()
+// 	wantErr := false
+// 	if (err != nil) != wantErr {
+// 		t.Errorf("error: %v, wantErr: %v", err, wantErr)
+// 		return
+// 	}
+// 	t.Log(ok)
+// }
