@@ -204,7 +204,6 @@ func (c *column) find(line, target string) {
 		l := strings.SplitAfterN(line, ":", 2)
 		// "name: abc" -> abcを抽出
 		*c = column(strings.Trim(l[1], " "))
-		//log.Println("new c", *c, " target:", target, " line", line)
 	}
 }
 
@@ -224,14 +223,14 @@ func (i CloudSQLInstance) DescribeInstance() (*CloudSQLDatabaseInstance, error) 
 
 	log.SetOutput(ioutil.Discard)  // 鍵情報などを出したくないので/dev/nullに出力
 	defer log.SetOutput(os.Stdout) // 出力先を戻す
-	cmd := "gcloud sql instances describe " + i.Instance
-	res, err := command.ExecAndWait(cmd)
+
+	res, err := doDescribeInstance(i.Instance)
 	if err != nil {
-		return nil, fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
+		return nil, fmt.Errorf("failed to doDescribeInstance: %v", err)
 	}
 	var name, version, loc, tier, state, connectionName column
 
-	for _, l := range strings.Split(res.Stdout, "\n") {
+	for _, l := range strings.Split(res, "\n") {
 		name.find(l, "name:")
 		version.find(l, "databaseVersion:")
 		loc.find(l, "gceZone:")
@@ -254,6 +253,15 @@ func (i CloudSQLInstance) DescribeInstance() (*CloudSQLDatabaseInstance, error) 
 		State:           string(state),
 		ConnectionName:  string(connectionName),
 	}, nil
+}
+
+var doDescribeInstance = func(instance string) (string, error) {
+	cmd := "gcloud sql instances describe " + instance
+	res, err := command.ExecAndWait(cmd)
+	if err != nil {
+		return "", fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
+	}
+	return res.Stdout, nil
 }
 
 // ConnectionName returns sql instance connection name.
