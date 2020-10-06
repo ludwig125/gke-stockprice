@@ -25,6 +25,8 @@ import (
 // テスト終了時に全部消すかどうか
 const deleteAllAtLast = true
 
+var cloudSQLPort = 3307
+
 func TestGKEStockPrice(t *testing.T) {
 	defer func() {
 		log.Println("integration test finished")
@@ -47,23 +49,6 @@ func TestGKEStockPrice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to NewCloudSQLInstance: %v", err)
 	}
-	// すでにSQLInstanceが存在するかどうか確認してなければ作る
-	if err := instance.CreateInstanceIfNotExist(); err != nil {
-		t.Fatalf("failed to CreateInstanceIfNotExist: %v", err)
-	}
-	// SQLInstanceの後処理
-	defer func() {
-		if !deleteAllAtLast {
-			log.Printf("don't delete SQL instance %#v", instance)
-			return
-		}
-		if err := instance.DeleteInstance(); err != nil {
-			t.Errorf("failed to DeleteInstance: %v", err)
-			return
-		}
-		// TODO: 本当に消えているかわからないので別に確認したほうが良さそう
-		// log.Printf("delete SQL instance %#v successfully", instance)
-	}()
 
 	// test用GKEクラスタ作成
 	clusterName := "gke-stockprice-cluster-integration-test"
@@ -76,87 +61,21 @@ func TestGKEStockPrice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to gke.NewCluster: %v", err)
 	}
-	if err := cluster.CreateClusterIfNotExist(); err != nil {
-		t.Fatalf("failed to gke.CreateClusterIfNotExist: %v", err)
-	}
-	// GKE Clusterの後処理
-	defer func() {
-		folderName := mustGetenv("DRIVE_FOLDER_NAME")
-		permissionTargetGmail := mustGetenv("DRIVE_PERMISSION_GMAIL")
-		fileName := "kubectl_logs"
-		dumpTime := now()
-		// kubectl logsの結果をupload
-		if err := uploadKubectlLog(ctx, dSrv, folderName, permissionTargetGmail, fileName, dumpTime); err != nil {
-			t.Errorf("failed to uploadKubectlLog: %v", err)
-		}
 
-		if !deleteAllAtLast {
-			log.Printf("don't delete GKE cluster %v", cluster.ClusterName)
-			return
+	// SQLInstanceとGKE CLusterの後処理
+	defer func() {
+		if err := postTest(ctx, dSrv, instance, cluster); err != nil {
+			t.Fatalf("failed to postTest: %v", err)
 		}
-		if err := cluster.DeleteCluster(); err != nil {
-			t.Errorf("failed to DeleteCluster: %#v", err)
-			return
-		}
-		// TODO: 本当に消えているかわからないので別に確認したほうが良さそう
-		// log.Printf("delete GKE cluster %v successfully", cluster.ClusterName)
 	}()
 
-	// SQL instance がRUNNABLEかどうか確認する
-	if err := instance.ConfirmCloudSQLInstanceStatusRunnable(); err != nil {
-		t.Fatalf("failed to ConfirmCloudSQLInstanceStatusRunnable: %v", err)
-	}
-	log.Printf("created SQL instance %#v and created test database %s successfully", instance, instance.Database)
-
-	// GKE clusterがRUNNINGかどうか確認する
-	if err := cluster.EnsureClusterStatusRunning(); err != nil {
-		t.Fatalf("failed to gke.EnsureClusterStatusRunning: %v", err)
-	}
-	log.Printf("created GKE cluster %#v successfully", cluster)
-	if err := cluster.GetCredentials(); err != nil {
-		t.Fatalf("failed to GetCredentials: %v", err)
-	}
-	log.Println("got GKE clustercredentials successfully")
-
-	sqlConnectionName, err := instance.ConnectionName()
-	if err != nil {
-		t.Fatalf("failed to get instance ConnectionName: %v", err)
-	}
-	// cloudSQLにmysqlclientから接続するためにCloudSQLProxyを立ち上げる
-	if err := runCloudSQLProxy(sqlConnectionName); err != nil {
-		t.Fatalf("failed to runCloudSQLProxy: %v", err)
-	}
-	// test用databaseとtableの作成
-	// deferによってテスト終了時に削除する
-	// _, err = database.SetupTestDB(3307) // 3307 はCloudSQL用のport
-	cleanup, err := database.SetupTestDB(3307) // 3307 はCloudSQL用のport
-	if err != nil {
-		t.Fatalf("failed to SetupTestDB: %v", err)
-	}
-	defer func() {
-		if !deleteAllAtLast {
-			log.Println("don't delete database")
-			return
-		}
-		cleanup()
-	}()
-
-	// GKE Nikkei mockデプロイ
-	if err := gke.KustomizeBuildAndDeploy("./nikkei_mock/k8s/"); err != nil {
-		t.Fatalf("failed to KustomizeBuildAndDeploy nikkei_mock: %v", err)
+	// SQLInstanceとGKE CLusterの作成と認証
+	if err := preTest(instance, cluster); err != nil {
+		t.Fatalf("failed to preTest: %v", err)
 	}
 
-	// kubernetesデプロイ前に必要なファイルを配置
-	if err := setFiles(sqlConnectionName); err != nil {
-		t.Fatalf("failed to setFiles: %v", err)
-	}
-
-	// GKE stockpriceデプロイ
-	if err := gke.KustomizeBuildAndDeploy("./k8s/overlays/dev/"); err != nil {
-		t.Fatalf("failed to KustomizeBuildAndDeploy: %#v", err)
-	}
 	// retryしながらCloudSQLにデータが入るまで待つ
-	if err := checkTestDataInDB(ctx); err != nil {
+	if err := checkTestDataInDB(ctx, databaseName); err != nil {
 		t.Errorf("failed to checkTestDataInDB: %v", err)
 	}
 
@@ -179,6 +98,136 @@ func TestGKEStockPrice(t *testing.T) {
 
 	// 成功してもしなくても、test用GKEクラスタを削除する
 	// 成功してもしなくても、test用CloudSQLを削除(または停止)する
+}
+
+func preTest(instance *cloudsql.CloudSQLInstance, cluster *gke.Cluster) error {
+	instanceErrCh := make(chan error)
+	go func() {
+		defer close(instanceErrCh)
+		start := time.Now()
+		if err := instance.CreateInstanceIfNotExist(); err != nil {
+			instanceErrCh <- fmt.Errorf("failed to CreateInstanceIfNotExist: %v", err)
+			return
+		}
+		// SQL instance がRUNNABLEかどうか確認する
+		if err := instance.ConfirmCloudSQLInstanceStatusRunnable(); err != nil {
+			instanceErrCh <- fmt.Errorf("failed to ConfirmCloudSQLInstanceStatusRunnable: %v", err)
+			return
+		}
+		log.Printf("created SQL instance %#v and created test database %s successfully. time: %v", instance, instance.Database, time.Since(start))
+	}()
+
+	clusterErrCh := make(chan error)
+	go func() {
+		defer close(clusterErrCh)
+		start := time.Now()
+		if err := cluster.CreateClusterIfNotExist(); err != nil {
+			clusterErrCh <- fmt.Errorf("failed to CreateClusterIfNotExist: %v", err)
+			return
+		}
+		// GKE clusterがRUNNINGかどうか確認する
+		if err := cluster.EnsureClusterStatusRunning(); err != nil {
+			clusterErrCh <- fmt.Errorf("failed to EnsureClusterStatusRunning: %v", err)
+			return
+		}
+		log.Printf("created GKE cluster %#v successfully. time: %v", cluster, time.Since(start))
+		if err := cluster.GetCredentials(); err != nil {
+			clusterErrCh <- fmt.Errorf("failed to GetCredentials: %v", err)
+			return
+		}
+		log.Println("got GKE clustercredentials successfully")
+	}()
+
+	if err := <-instanceErrCh; err != nil {
+		return fmt.Errorf("failed to create instance: %v", err)
+	}
+
+	if err := <-clusterErrCh; err != nil {
+		return fmt.Errorf("failed to create cluster: %v", err)
+	}
+
+	sqlConnectionName, err := instance.ConnectionName()
+	if err != nil {
+		return fmt.Errorf("failed to get instance ConnectionName: %v", err)
+	}
+	// cloudSQLにmysqlclientから接続するためにCloudSQLProxyを立ち上げる
+	if err := runCloudSQLProxy(sqlConnectionName); err != nil {
+		return fmt.Errorf("failed to runCloudSQLProxy: %v", err)
+	}
+	// test用databaseとtableの作成
+	// SQLInstanceごと消すので、終了時にDatabaseは消さない
+	_, err = database.SetupTestDB(3307) // 3307 はCloudSQL用のport
+	if err != nil {
+		return fmt.Errorf("failed to SetupTestDB: %v", err)
+	}
+
+	// GKE Nikkei mockデプロイ
+	if err := gke.KustomizeBuildAndDeploy("./nikkei_mock/k8s/"); err != nil {
+		return fmt.Errorf("failed to KustomizeBuildAndDeploy nikkei_mock: %v", err)
+	}
+
+	// kubernetesデプロイ前に必要なファイルを配置
+	if err := setFiles(sqlConnectionName); err != nil {
+		return fmt.Errorf("failed to setFiles: %v", err)
+	}
+
+	// GKE stockpriceデプロイ
+	if err := gke.KustomizeBuildAndDeploy("./k8s/overlays/dev/"); err != nil {
+		return fmt.Errorf("failed to KustomizeBuildAndDeploy: %#v", err)
+	}
+
+	return nil
+}
+
+func postTest(ctx context.Context, dSrv *drive.Service, instance *cloudsql.CloudSQLInstance, cluster *gke.Cluster) error {
+	instanceErrCh := make(chan error)
+	go func() {
+		defer close(instanceErrCh)
+		if !deleteAllAtLast {
+			log.Printf("don't delete SQL instance %#v", instance)
+			return
+		}
+		start := time.Now()
+		if err := instance.DeleteInstanceIfExist(); err != nil {
+			instanceErrCh <- fmt.Errorf("failed to DeleteInstanceIfExist: %v", err)
+			return
+		}
+		log.Printf("delete SQL instance %#v successfully. time: %v", instance, time.Since(start))
+	}()
+
+	clusterErrCh := make(chan error)
+	go func() {
+		defer close(clusterErrCh)
+
+		folderName := mustGetenv("DRIVE_FOLDER_NAME")
+		permissionTargetGmail := mustGetenv("DRIVE_PERMISSION_GMAIL")
+		fileName := "kubectl_logs"
+		dumpTime := now()
+		// kubectl logsの結果をupload
+		if err := uploadKubectlLog(ctx, dSrv, folderName, permissionTargetGmail, fileName, dumpTime); err != nil {
+			log.Printf("failed to uploadKubectlLog: %v", err)
+		}
+
+		if !deleteAllAtLast {
+			log.Printf("don't delete GKE cluster %v", cluster.ClusterName)
+			return
+		}
+		start := time.Now()
+		if err := cluster.DeleteCluster(); err != nil {
+			clusterErrCh <- fmt.Errorf("failed to DeleteCluster: %#v", err)
+			return
+		}
+		log.Printf("delete GKE cluster %v successfully. time: %v", cluster.ClusterName, time.Since(start))
+	}()
+
+	if err := <-instanceErrCh; err != nil {
+		return fmt.Errorf("failed to delete instance: %v", err)
+	}
+
+	if err := <-clusterErrCh; err != nil {
+		return fmt.Errorf("failed to delete cluster: %v", err)
+	}
+	return nil
 }
 
 func setFiles(connectionName string) error {
@@ -231,14 +280,15 @@ func runCloudSQLProxy(connectionName string) error {
 	return nil
 }
 
-func checkTestDataInDB(ctx context.Context) error {
+func checkTestDataInDB(ctx context.Context, databaseName string) error {
 	var db database.DB
 	// DBにつながるまでretryする
 	if err := retry.WithContext(ctx, 20, 3*time.Second, func() error {
 		var e error
+		host := fmt.Sprintf("127.0.0.1:%d", cloudSQLPort)
 		db, e = database.NewDB(fmt.Sprintf("%s/%s",
-			getDSN("root", "", "127.0.0.1:3307"),
-			"stockprice_dev"))
+			getDSN("root", "", host),
+			databaseName))
 		return e
 	}); err != nil {
 		return fmt.Errorf("failed to NewDB: %w", err)
