@@ -60,7 +60,6 @@ func NewCloudSQLInstance(instanceName, region, tier, databaseName string) (*Clou
 func (i CloudSQLInstance) CreateInstance() error {
 	cmd := i.createInstanceCommand()
 	res, err := command.ExecAndWait(cmd) // コマンドの完了を待つ
-	// _, err := command.Exec(cmd) // コマンドの完了を待たないのでSQLInstanceが作成されて稼働中かどうかは保証しない
 	if err != nil {
 		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s,res: %#v", err, cmd, res)
 	}
@@ -79,15 +78,16 @@ func (i CloudSQLInstance) CreateInstanceIfNotExist() error {
 	if err != nil {
 		return fmt.Errorf("failed to ExistCloudSQLInstance: %#v", err)
 	}
-	if !ok {
-		// SQLInstanceがないなら作る
-		log.Println("SQL Instance does not exists. trying to create...")
-		if err := i.CreateInstance(); err != nil {
-			return fmt.Errorf("failed to CreateInstance: %#v", err)
-		}
+	if ok {
+		log.Println("SQL Instance already exists. no need to create")
+		return nil
 	}
 
-	log.Println("SQL Instance already exists")
+	// SQLInstanceがないなら作る
+	log.Println("SQL Instance does not exists. trying to create...")
+	if err := i.CreateInstance(); err != nil {
+		return fmt.Errorf("failed to CreateInstance: %#v", err)
+	}
 	return nil
 }
 
@@ -99,7 +99,6 @@ func (i CloudSQLInstance) DeleteInstance() error {
 	}
 	res, err := command.ExecAndWait(cmd) // 削除完了を待つ
 	if err != nil {
-		// if _, err := command.Exec(cmd); err != nil { // 削除完了を待たない
 		return fmt.Errorf("failed to Exec: %v, cmd: %s, res: %#v", err, cmd, res)
 	}
 	log.Printf("DeleteInstance result: %#v", res)
@@ -114,6 +113,25 @@ func (i CloudSQLInstance) deleteInstanceCommand() (string, error) {
 		return "", fmt.Errorf("instance name should not contains 'prod'. instance: %s", i.Instance)
 	}
 	return fmt.Sprintf("gcloud --quiet sql instances delete %s", i.Instance), nil
+}
+
+func (i CloudSQLInstance) DeleteInstanceIfExist() error {
+	// すでにSQLInstanceが存在するかどうか確認
+	ok, err := i.ExistCloudSQLInstance()
+	if err != nil {
+		return fmt.Errorf("failed to ExistCloudSQLInstance: %#v", err)
+	}
+	if !ok {
+		log.Println("SQL Instance does not exist. no need to delete")
+		return nil
+	}
+
+	// SQLInstanceがあるなら削除する
+	log.Println("SQL Instance exists. trying to delete...")
+	if err := i.DeleteInstance(); err != nil {
+		return fmt.Errorf("failed to DeleteInstance: %#v", err)
+	}
+	return nil
 }
 
 // このAPIはサービスアカウントでは使えない
