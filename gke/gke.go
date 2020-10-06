@@ -57,7 +57,6 @@ func (c Cluster) CreateCluster() error {
 	cmd := c.createClusterCommand()
 	res, err := command.ExecAndWait(cmd) // コマンドの完了を待つ
 	if err != nil {
-		// if _, err := command.Exec(cmd); err != nil { // コマンドの完了を待たないのでClusterが作成されて稼働中かどうかは保証しない
 		return fmt.Errorf("failed to Exec: %v, cmd: %s, res: %#v", err, cmd, res)
 	}
 	log.Printf("CreateCluster result: %#v", res)
@@ -75,19 +74,20 @@ func (c Cluster) createClusterCommand() string {
 
 // CreateClusterIfNotExist creates gke cluster if cluster does not exist.
 func (c Cluster) CreateClusterIfNotExist() error {
-	// すでにClusterが存在するかどうか確認
+	// Clusterが存在するかどうか確認
 	cls, err := c.ListCluster()
 	if err != nil {
 		return fmt.Errorf("failed to ListCluster: %w", err)
 	}
 
 	// GKEクラスタがないときは作成する
-	_, ok := c.extractFromListedCluster(cls)
-	if !ok {
-		log.Println("GKE cluster does not exists. trying to create...")
-		if c.CreateCluster(); err != nil {
-			return fmt.Errorf("failed to CreateCluster: %#v", err)
-		}
+	if _, ok := c.extractFromListedCluster(cls); ok {
+		log.Println("GKE cluster already exist. no need to create")
+		return nil
+	}
+	log.Println("GKE cluster does not exists. trying to create...")
+	if c.CreateCluster(); err != nil {
+		return fmt.Errorf("failed to CreateCluster: %#v", err)
 	}
 	return nil
 }
@@ -98,7 +98,6 @@ func (c Cluster) DeleteCluster() error {
 	cmd := c.deleteClusterCommand()
 	res, err := command.ExecAndWait(cmd)
 	if err != nil { // 削除完了を待つ
-		// if _, err := command.Exec(cmd); err != nil { // 削除完了を待たない
 		return fmt.Errorf("failed to Exec: %v, cmd: %s", err, cmd)
 	}
 	log.Printf("DeleteCluster result: %#v", res)
@@ -107,6 +106,26 @@ func (c Cluster) DeleteCluster() error {
 
 func (c Cluster) deleteClusterCommand() string {
 	return fmt.Sprintf("gcloud --quiet container clusters delete %s", c.ClusterName)
+}
+
+// DeleteClusterIfExist delete gke cluster if cluster exist.
+func (c Cluster) DeleteClusterIfExist() error {
+	// Clusterが存在するかどうか確認
+	cls, err := c.ListCluster()
+	if err != nil {
+		return fmt.Errorf("failed to ListCluster: %w", err)
+	}
+
+	// GKEクラスタがあるときは削除する
+	if _, ok := c.extractFromListedCluster(cls); !ok {
+		log.Println("GKE cluster does not exist. no need to delete")
+		return nil
+	}
+	log.Println("GKE cluster exists. trying to delete...")
+	if c.DeleteCluster(); err != nil {
+		return fmt.Errorf("failed to DeleteCluster: %#v", err)
+	}
+	return nil
 }
 
 // ListCluster lists all gke clusters.
