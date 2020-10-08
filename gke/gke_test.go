@@ -26,7 +26,7 @@ func TestNewCluster(t *testing.T) {
 				MachineType: "g1-small",
 				DiskSize:    10,
 				NumNodes:    4,
-				Preemptible: "preemptible",
+				Preemptible: "on",
 			},
 			wantErr:       false,
 			wantCreateCmd: `gcloud --quiet container clusters create cluster1 --zone zone1 --machine-type=g1-small --disk-size 10 --num-nodes=4 --preemptible`,
@@ -39,7 +39,7 @@ func TestNewCluster(t *testing.T) {
 				MachineType: "g1-small",
 				DiskSize:    10,
 				NumNodes:    4,
-				Preemptible: "preemptible",
+				Preemptible: "on",
 			},
 			wantErr: true,
 		},
@@ -51,7 +51,7 @@ func TestNewCluster(t *testing.T) {
 				MachineType: "g1-small",
 				DiskSize:    10,
 				NumNodes:    4,
-				Preemptible: "preemptible",
+				Preemptible: "on",
 			},
 			wantErr: true,
 		},
@@ -76,7 +76,15 @@ func TestNewCluster(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cl, err := NewCluster(tc.clusterName, tc.computeZone, tc.machineType, tc.diskSize, tc.numNodes, tc.preemptible)
+			clusterConfig := ClusterConfig{
+				ClusterName: tc.clusterName,
+				ComputeZone: tc.computeZone,
+				MachineType: tc.machineType,
+				DiskSize:    tc.diskSize,
+				NumNodes:    tc.numNodes,
+				Preemptible: tc.preemptible,
+			}
+			cl, err := NewCluster(clusterConfig)
 			if err != nil {
 				if !tc.wantErr {
 					t.Errorf("gotErr: %v, wantErr: %v", err, tc.wantErr)
