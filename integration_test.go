@@ -51,13 +51,15 @@ func TestGKEStockPrice(t *testing.T) {
 	}
 
 	// test用GKEクラスタ作成
-	clusterName := "gke-stockprice-cluster-integration-test"
-	computeZone := "us-central1-f"
-	machineType := "g1-small"
-	diskSize := 10
-	numNodes := 4
-	preemptible := "on"
-	cluster, err := gke.NewCluster(clusterName, computeZone, machineType, diskSize, numNodes, preemptible)
+	clusterConfig := gke.ClusterConfig{
+		ClusterName: "gke-stockprice-cluster-integration-test",
+		ComputeZone: "us-central1-f",
+		MachineType: "g1-small",
+		DiskSize:    10,
+		NumNodes:    4,
+		Preemptible: "on",
+	}
+	cluster, err := gke.NewCluster(clusterConfig)
 	if err != nil {
 		t.Fatalf("failed to gke.NewCluster: %v", err)
 	}
@@ -213,7 +215,7 @@ func postTest(ctx context.Context, dSrv *drive.Service, instance *cloudsql.Cloud
 			return
 		}
 		start := time.Now()
-		if err := cluster.DeleteCluster(); err != nil {
+		if err := cluster.DeleteClusterIfExist(); err != nil {
 			clusterErrCh <- fmt.Errorf("failed to DeleteCluster: %#v", err)
 			return
 		}

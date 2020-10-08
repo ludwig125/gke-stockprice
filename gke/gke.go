@@ -21,30 +21,44 @@ type Cluster struct {
 	Preemptible string
 }
 
+// ClusterConfig is configuration for new gke cluster
+type ClusterConfig struct {
+	ClusterName string
+	ComputeZone string
+	MachineType string
+	DiskSize    int
+	NumNodes    int
+	Preemptible string
+}
+
 // NewCluster Cluster constructor.
-func NewCluster(clusterName, computeZone, machineType string, diskSize, numNodes int, preemptible string) (*Cluster, error) {
-	if clusterName == "" {
+func NewCluster(c ClusterConfig) (*Cluster, error) {
+	if c.ClusterName == "" {
 		return nil, errors.New("clusterName is empty")
 	}
-	if computeZone == "" {
+	if c.ComputeZone == "" {
 		return nil, errors.New("computeZone is empty")
 	}
-	if machineType == "" {
-		machineType = "g1-small"
+	machineType := "g1-small"
+	if c.MachineType != "" {
+		machineType = c.MachineType
 	}
-	if diskSize == 0 {
-		diskSize = 10
+	diskSize := 10
+	if c.DiskSize != 0 {
+		diskSize = c.DiskSize
 	}
-	if numNodes == 0 {
-		numNodes = 4
+	numNodes := 4
+	if c.NumNodes != 0 {
+		numNodes = c.NumNodes
 	}
-	if preemptible != "off" {
-		preemptible = "preemptible"
+	preemptible := "on"
+	if c.Preemptible == "off" {
+		preemptible = "off"
 	}
 
 	return &Cluster{
-		ClusterName: clusterName,
-		ComputeZone: computeZone,
+		ClusterName: c.ClusterName,
+		ComputeZone: c.ComputeZone,
 		MachineType: machineType,
 		DiskSize:    diskSize,
 		NumNodes:    numNodes,
@@ -65,7 +79,7 @@ func (c Cluster) CreateCluster() error {
 
 func (c Cluster) createClusterCommand() string {
 	preemptible := ""
-	if c.Preemptible == "preemptible" {
+	if c.Preemptible == "on" {
 		preemptible = "--preemptible"
 	}
 	// 作るかどうかy/n の入力を待たないように-quietオプションつけている
@@ -81,7 +95,7 @@ func (c Cluster) CreateClusterIfNotExist() error {
 	}
 
 	// GKEクラスタがないときは作成する
-	if _, ok := c.extractFromListedCluster(cls); ok {
+	if _, ok := c.ExtractFromListedCluster(cls); ok {
 		log.Println("GKE cluster already exist. no need to create")
 		return nil
 	}
@@ -117,7 +131,7 @@ func (c Cluster) DeleteClusterIfExist() error {
 	}
 
 	// GKEクラスタがあるときは削除する
-	if _, ok := c.extractFromListedCluster(cls); !ok {
+	if _, ok := c.ExtractFromListedCluster(cls); !ok {
 		log.Println("GKE cluster does not exist. no need to delete")
 		return nil
 	}
@@ -159,8 +173,9 @@ type ListedCluster struct {
 	Status        string // STATUS
 }
 
-// ListedClusterから該当のClusterを取得する。取得できなかったらfalse
-func (c Cluster) extractFromListedCluster(lcs []ListedCluster) (ListedCluster, bool) {
+// ExtractFromListedCluster extract cluster from ListedCluster.
+func (c Cluster) ExtractFromListedCluster(lcs []ListedCluster) (ListedCluster, bool) {
+	// ListedClusterから該当のClusterを取得する。取得できなかったらfalse
 	for _, lc := range lcs {
 		// cluster名が一致したらok
 		if lc.Name == c.ClusterName {
@@ -206,7 +221,7 @@ func (c Cluster) EnsureClusterStatusRunning() error {
 		if err != nil {
 			return fmt.Errorf("failed to ListCluster: %v", err)
 		}
-		lc, ok := c.extractFromListedCluster(lcs)
+		lc, ok := c.ExtractFromListedCluster(lcs)
 		if !ok { // Clusterがなければエラー
 			return fmt.Errorf("failed to extractFromListedCluster: %v", err)
 		}
