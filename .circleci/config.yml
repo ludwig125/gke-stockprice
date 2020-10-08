@@ -304,6 +304,43 @@ jobs:
           name: Check GKE Cluster
           command: gcloud container clusters list
 
+  delete_gke_cluster_by_golang:
+    working_directory: ~/go/src/github.com/ludwig125
+    environment:
+      PROJECT_NAME: gke-stockprice
+      CLUSTER_NAME: gke-stockprice-cluster-prod
+      COMPUTE_ZONE: us-central1-f
+      # CRON_JOB: prod-gke-stockprice
+    docker:
+      - image: google/cloud-sdk # kubectlを使うのでalpineではない
+    steps:
+      - checkout
+      - run:
+          name: Install wget
+          command: |
+            apt-get install -y wget
+      - run:
+          name: Install go
+          command: |
+            wget https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz
+            tar -C /usr/local -xzf go$GO_VERSION.linux-amd64.tar.gz
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
+            source $BASH_ENV
+            go version
+      - run:
+          name: Activate Service Account
+          command: |
+            echo $GCLOUD_SERVICE_KEY | base64 -di > gke-stockprice-serviceaccount.json
+            gcloud auth activate-service-account --key-file gke-stockprice-serviceaccount.json
+            gcloud config set project $PROJECT_NAME
+      - run:
+          name: Delete GKE Cluster
+          command: |
+            export CREDENTIAL_FILEPATH=gke-stockprice-serviceaccount.json
+            export DRIVE_FOLDER_NAME=gke-stockprice-dump
+            export DRIVE_PERMISSION_GMAIL=${GMAIL}
+            go run cmd/delete_cluster/delete_cluster.go
+
   list_gke_cluster:
     working_directory: ~/go/src/github.com/ludwig125
     environment:
