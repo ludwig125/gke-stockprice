@@ -310,7 +310,7 @@ jobs:
       PROJECT_NAME: gke-stockprice
       CLUSTER_NAME: gke-stockprice-cluster-prod
       COMPUTE_ZONE: us-central1-f
-      # CRON_JOB: prod-gke-stockprice
+      GO_VERSION: 1.14.1
     docker:
       - image: google/cloud-sdk # kubectlを使うのでalpineではない
     steps:
