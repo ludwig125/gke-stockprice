@@ -53,7 +53,7 @@ func main() {
 		log.Fatalf("failed to ListCluster: %v", err)
 	}
 	// GKEクラスタがあるときはエラー
-	if _, ok := cluster.ExtractFromListedCluster(cls); !ok {
+	if _, ok := cluster.ExtractFromListedCluster(cls); ok {
 		log.Fatalf("GKE cluster stil exists. failed to delete cluster")
 	}
 	log.Println("GKE cluster already deleted")
