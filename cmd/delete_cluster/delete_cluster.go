@@ -41,7 +41,9 @@ func main() {
 	}
 
 	// kubectl logs
-	kubectlLogs(ctx, dSrv)
+	if err := kubectlLogs(ctx, dSrv, cluster); err != nil {
+		log.Println("failed to kubectlLogs:", err)
+	}
 	// cluster削除
 	if err := deleteCluster(cluster); err != nil {
 		log.Fatalf("failed to deleteCluster: %v", err)
@@ -59,15 +61,22 @@ func main() {
 	log.Println("GKE cluster already deleted")
 }
 
-func kubectlLogs(ctx context.Context, dSrv *drive.Service) {
+func kubectlLogs(ctx context.Context, dSrv *drive.Service, cluster *gke.Cluster) error {
+	// kubectl logsの前にクラスタの認証が必要
+	if err := cluster.GetCredentials(); err != nil {
+		return fmt.Errorf("failed to GetCredentials: %v", err)
+	}
+	log.Println("got GKE clustercredentials successfully")
+
 	folderName := mustGetenv("DRIVE_FOLDER_NAME")
 	permissionTargetGmail := mustGetenv("DRIVE_PERMISSION_GMAIL")
 	fileName := "kubectl_logs"
 	dumpTime := time.Now()
 	// kubectl logsの結果をupload
 	if err := uploadKubectlLog(ctx, dSrv, folderName, permissionTargetGmail, fileName, dumpTime); err != nil {
-		log.Printf("failed to uploadKubectlLog: %v", err)
+		return fmt.Errorf("failed to uploadKubectlLog: %v", err)
 	}
+	return nil
 }
 
 func deleteCluster(cluster *gke.Cluster) error {
@@ -75,10 +84,6 @@ func deleteCluster(cluster *gke.Cluster) error {
 		log.Printf("DELETE_ALL_AT_LAST is off. don't delete GKE cluster %v", cluster.ClusterName)
 		return nil
 	}
-	if err := cluster.GetCredentials(); err != nil {
-		return fmt.Errorf("failed to GetCredentials: %v", err)
-	}
-	log.Println("got GKE clustercredentials successfully")
 	start := time.Now()
 	if err := cluster.DeleteClusterIfExist(); err != nil {
 		return fmt.Errorf("failed to DeleteClusterIfExist: %#v", err)
