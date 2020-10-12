@@ -2,68 +2,41 @@ namePrefix: dev-
 commonLabels:
   variant: dev
 commonAnnotations:
-  note: Hello, I am dev!
+  note: This is dev!
 resources:
 - ../../base
 patchesStrategicMerge:
 - map.yaml
 
-# configMapGenerator:
-# - name: sql-proxy-config
-#   behavior: replace
-#   literals:
-#   - db_connection_name=gke-stockprice:us-central1:gke-stockprice-us-central1-db-f1-micro-201911170406
-
-
 configMapGenerator:
 - name: stockprice-configmap
-  behavior: create
+  behavior: merge
   literals:
+  - ENV=dev
   - MYSQLDUMP_TO_GOOGLEDRIVE=on
   - DUMP_EXECUTE_DAYS=Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday # 毎日
   - DRIVE_FOLDER_NAME=gke-stockprice-dump-test
   - DRIVE_FILE_MIMETYPE=text/plain
-  - DRIVE_NEED_TO_BACKUP=3
+  - DRIVE_NEED_TO_BACKUP=1
   - DB_HOST=127.0.0.1
   - DB_PORT=3306
   - DB_NAME=stockprice_dev
   - DUMP_TARGET_TABLES=daily,movingavg
-- name: debug-config
-  behavior: create
-  literals:
-  - debug=on
+  files:
+  - GROWTHTREND_TARGETDATE=growthtrend_targetdate.txt # integration_test内で動的に生成される
+  - DAILY_PRICE_URL=daily_price_url.txt # integration_test内で動的に生成される
+
 - name: sql-proxy-config
   behavior: create
-  # literals:
-  # - db_connection_name=gke-stockprice:us-central1:gke-stockprice-integration-test-202001100551
   files:
   - db_connection_name=db_connection_name.txt # integration_test内で動的に生成される
-- name: daily-config
-  behavior: create
-  files:
-  - daily_price_url=daily_price_url.txt # integration_test内で動的に生成される
-- name: growthtrend-config
-  behavior: create
-  files:
-  - growthtrend_targetdate=growthtrend_targetdate.txt # integration_test内で動的に生成される
-
-
 
 secretGenerator:
-# - name: db-config
-#   behavior: replace
-#   files:
-#   # いまintegration testではpassword設定されていない！
-#   - db_username=db_username.txt # integration_test前に配置しておく(echo -n "value" > fileの形で)
-#   - db_password=db_password.txt # integration_test前に配置しておく
-- name: sheetids
-  behavior: create
+- name: stockprice-secret
+  behavior: merge
   files:
-  - holiday_sheetid=dev_sheetid.txt # integration_test前に配置しておく
-  - companycode_sheetid=dev_sheetid.txt # integration_test前に配置しておく
-  - trend_sheetid=dev_sheetid.txt # integration_test前に配置しておく
-  - status_sheetid=dev_sheetid.txt # integration_test前に配置しておく
-- name: gmail-config
-  behavior: create
-  files:
-  - gmail=gmail.txt
+  - HOLIDAY_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
+  - COMPANYCODE_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
+  - TREND_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
+  - STATUS_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
+  - DRIVE_PERMISSION_GMAIL=gmail.txt

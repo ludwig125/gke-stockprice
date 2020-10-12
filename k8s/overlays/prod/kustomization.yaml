@@ -5,94 +5,57 @@ namePrefix: prod-
 commonLabels:
   variant: prod
 commonAnnotations:
-  note: Hello, I am prod!
+  note: This is prod!
 resources:
 - ../../base
 
 configMapGenerator:
 - name: stockprice-configmap
-  behavior: create
+  behavior: merge
   literals:
+  - ENV=prod
+  - DEBUG=off
+  - DELETE_GKE_CLUSTER=off
+  - SEND_SLACK_MESSAGE=on
+  - CHECK_DAYOFF=on
+  - SCRAPE_TIMEOUT=10000
+  - CALC_MOVINGAVG_CONCURRENCY=1
+  - CALC_GROWTHTREND_CONCURRENCY=1
   - MYSQLDUMP_TO_GOOGLEDRIVE=on
   - DUMP_EXECUTE_DAYS=Sunday
   - DRIVE_FOLDER_NAME=gke-stockprice-dump
   - DRIVE_FILE_MIMETYPE=text/plain
-  - DRIVE_NEED_TO_BACKUP=7
+  - DRIVE_NEED_TO_BACKUP=3
   - DB_HOST=127.0.0.1
   - DB_PORT=3306
   - DB_NAME=stockprice
   - DUMP_TARGET_TABLES=daily,movingavg
-- name: debug-config
-  behavior: create
-  literals:
-  - debug=off
-- name: env
-  behavior: replace
-  literals:
-  - environment=prod
+  files:
+  # echo -n "value" > fileの形で事前に配置しておく
+  # echo -nする理由は、環境変数の末尾に改行コードが含まれないようにするため
+  - DAILY_PRICE_URL=daily_price_url.txt
+
 - name: sql-proxy-config
   behavior: create
   literals:
   - db_connection_name=gke-stockprice:us-central1:gke-stockprice-cloudsql-prod # 事前に作成されているprod用DBのConnectionName
-- name: daily-config
-  behavior: create
-  files:
-  - daily_price_url=daily_price_url.txt
-- name: growthtrend-config
-  behavior: create
-  literals:
-  - growthtrend_targetdate=
-- name: delete-gke-cluster
-  behavior: replace
-  literals:
-  - flag=off
-- name: send-slack
-  behavior: replace
-  literals:
-  - flag=on
-- name: check-dayoff
-  behavior: replace
-  literals:
-  - flag=on
-- name: scrape-timeout
-  behavior: replace
-  literals:
-  - timeout=10000
-- name: moving-concurrency
-  behavior: replace
-  literals:
-  - concurrency=1
-- name: growthtrend-concurrency
-  behavior: replace
-  literals:
-  - concurrency=1
 
 secretGenerator:
-- name: db-config
-  behavior: replace
+- name: stockprice-secret
+  behavior: merge
   files:
-  - db_username=db_username.txt # echo -n "value" > fileの形で配置しておく
-  - db_password=db_password.txt # echo -n "value" > fileの形で配置しておく
-- name: sheetids
-  behavior: create
-  files:
-  - holiday_sheetid=sheetid.txt # 事前に配置しておく
-  - companycode_sheetid=sheetid.txt # 事前に配置しておく
-  - trend_sheetid=sheetid.txt # 事前に配置しておく
-  - status_sheetid=sheetid.txt # 事前に配置しておく
+  # echo -n "value" > fileの形で事前に配置しておく
+  # echo -nする理由は、環境変数の末尾に改行コードが含まれないようにするため
+  - DB_USER=db_username.txt
+  - DB_PASSWORD=db_password.txt
+  - HOLIDAY_SHEETID=sheetid.txt
+  - COMPANYCODE_SHEETID=sheetid.txt
+  - TREND_SHEETID=sheetid.txt
+  - STATUS_SHEETID=sheetid.txt
+  - SLACK_TOKEN=slack_token.txt
+  - SLACK_CHANNEL=slack_channel.txt
+  - CIRCLE_API_USER_TOKEN=circleci_token.txt
+  - DRIVE_PERMISSION_GMAIL=gmail.txt
 
-- name: slack-config
-  behavior: replace
-  files:
-  - slack_token=slack_token.txt
-  - slack_channel=slack_channel.txt
-- name: circleci-api-config
-  behavior: replace
-  files:
-  - circleci_token=circleci_token.txt
-- name: gmail-config
-  behavior: create
-  files:
-  - gmail=gmail.txt
 patchesStrategicMerge:
 - patch_cron_schedule.yaml
