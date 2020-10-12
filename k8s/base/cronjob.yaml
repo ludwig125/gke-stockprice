@@ -63,122 +63,20 @@ spec:
             envFrom:
             - configMapRef:
                 name: stockprice-configmap
+            envFrom:
+            - secretMapRef:
+                name: stockprice-secret
             env:
             - name: ENV_NUMBER
               valueFrom:
                 configMapKeyRef:
                   name: the-map
                   key: env_number
-            - name: DEBUG
-              valueFrom:
-                configMapKeyRef:
-                  name: debug-config
-                  key: debug
-            - name: ENV
-              valueFrom:
-                configMapKeyRef:
-                  name: env
-                  key: environment
             - name: DB_CONNECTION_NAME
               valueFrom:
                 configMapKeyRef:
                   name: sql-proxy-config
                   key: db_connection_name
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: db-config
-                  key: db_username
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: db-config
-                  key: db_password
-            - name: CREDENTIAL_FILEPATH
-              valueFrom:
-                configMapKeyRef:
-                  name: sheet-config
-                  key: sheet-credential-path # 記載しているのは秘密鍵ファイルのパスのみ
-            - name: DAILY_PRICE_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: daily-config
-                  key: daily_price_url
-            - name: HOLIDAY_SHEETID
-              valueFrom:
-                secretKeyRef:
-                  name: sheetids
-                  key: holiday_sheetid
-            - name: COMPANYCODE_SHEETID
-              valueFrom:
-                secretKeyRef:
-                  name: sheetids
-                  key: companycode_sheetid
-            - name: TREND_SHEETID
-              valueFrom:
-                secretKeyRef:
-                  name: sheetids
-                  key: trend_sheetid
-            - name: STATUS_SHEETID
-              valueFrom:
-                secretKeyRef:
-                  name: sheetids
-                  key: status_sheetid
-            - name: SLACK_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: slack-config
-                  key: slack_token
-            - name: SLACK_CHANNEL
-              valueFrom:
-                secretKeyRef:
-                  name: slack-config
-                  key: slack_channel
-            - name: CIRCLE_API_USER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: circleci-api-config
-                  key: circleci_token
-            - name: SCRAPE_TIMEOUT
-              valueFrom:
-                configMapKeyRef:
-                  name: scrape-timeout
-                  key: timeout
-            - name: GROWTHTREND_TARGETDATE
-              valueFrom:
-                configMapKeyRef:
-                  name: growthtrend-config
-                  key: growthtrend_targetdate
-            - name: CALC_MOVINGAVG_CONCURRENCY
-              valueFrom:
-                configMapKeyRef:
-                  name: moving-concurrency
-                  key: concurrency
-            - name: CALC_GROWTHTREND_CONCURRENCY
-              valueFrom:
-                configMapKeyRef:
-                  name: growthtrend-concurrency
-                  key:  concurrency
-            - name: DELETE_GKE_CLUSTER
-              valueFrom:
-                configMapKeyRef:
-                  name: delete-gke-cluster
-                  key: flag
-            - name: SEND_SLACK_MESSAGE
-              valueFrom:
-                configMapKeyRef:
-                  name: send-slack
-                  key: flag
-            - name: CHECK_DAYOFF
-              valueFrom:
-                configMapKeyRef:
-                  name: check-dayoff
-                  key: flag
-            - name: DRIVE_PERMISSION_GMAIL
-              valueFrom:
-                secretKeyRef:
-                  name: gmail-config
-                  key: gmail
             volumeMounts:
               - name: serviceaccount-volume
                 mountPath: credential
