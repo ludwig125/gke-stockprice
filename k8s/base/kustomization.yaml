@@ -10,52 +10,23 @@ resources:
 generatorOptions:
   disableNameSuffixhash: true
 
-# configMapGenerator:
-# - name: sql-proxy-config
-#   literals:
-#   - db_connection_name=override.me
-
 configMapGenerator:
-# - name: stockprice-configmap
-#   literals:
-#   - DB_HOST=127.0.0.1
-- name: sheet-config
+- name: stockprice-configmap
   literals:
-  - sheet-credential-path=/credential/gke-stockprice-serviceaccount.json
-- name: env
-  literals:
-  - environment=dev
-- name: delete-gke-cluster
-  literals:
-  - flag=off
-- name: send-slack
-  literals:
-  - flag=off
-- name: check-dayoff
-  literals:
-  - flag=off
-- name: scrape-timeout
-  literals:
-  - timeout=1000
-- name: moving-concurrency
-  literals:
-  - concurrency=3
-- name: growthtrend-concurrency
-  literals:
-  - concurrency=3
+  - DEBUG=on
+  - DELETE_GKE_CLUSTER=off
+  - SEND_SLACK_MESSAGE=off
+  - CHECK_DAYOFF=off
+  - SCRAPE_TIMEOUT=1000
+  - CALC_MOVINGAVG_CONCURRENCY=3
+  - CALC_GROWTHTREND_CONCURRENCY=3
+  - GROWTHTREND_TARGETDATE=""
+  - CREDENTIAL_FILEPATH=/credential/gke-stockprice-serviceaccount.json # 記載しているのは秘密鍵ファイルのパスのみ
 
 secretGenerator:
-- name: kube-gke-stockprice-serviceaccount
+- name: stockprice-secret
   files:
   - gke-stockprice-serviceaccount.json
-- name: db-config
   literals:
-  - db_username=root
-  - db_password=
-- name: slack-config
-  literals:
-  - slack_token=override.me
-  - slack_channel=override.me
-- name: circleci-api-config
-  literals:
-  - circleci_token=override.me
+  - DB_USER=root
+  - DB_PASSWORD=
