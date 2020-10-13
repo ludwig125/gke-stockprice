@@ -24,9 +24,10 @@ configMapGenerator:
   - CREDENTIAL_FILEPATH=/credential/gke-stockprice-serviceaccount.json # 記載しているのは秘密鍵ファイルのパスのみ
 
 secretGenerator:
-- name: stockprice-secret
+- name: kube-gke-stockprice-serviceaccount
   files:
   - gke-stockprice-serviceaccount.json
+- name: stockprice-secret
   literals:
   - DB_USER=root
   - DB_PASSWORD=
