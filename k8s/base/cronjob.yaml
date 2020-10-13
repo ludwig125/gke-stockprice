@@ -63,8 +63,7 @@ spec:
             envFrom:
             - configMapRef:
                 name: stockprice-configmap
-            envFrom:
-            - secretMapRef:
+            - secretRef:
                 name: stockprice-secret
             env:
             - name: ENV_NUMBER
