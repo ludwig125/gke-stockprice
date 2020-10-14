@@ -15,7 +15,7 @@ configMapGenerator:
   literals:
   - ENV=prod
   - DEBUG=off
-  - DELETE_GKE_CLUSTER=off
+  - DELETE_GKE_CLUSTER=on
   - SEND_SLACK_MESSAGE=on
   - CHECK_DAYOFF=on
   - SCRAPE_TIMEOUT=10000
