@@ -42,7 +42,7 @@ func main() {
 	if os.Getenv("DELETE_GKE_CLUSTER") == "on" {
 		ciToken := mustGetenv("CIRCLE_API_USER_TOKEN")
 		defer func() {
-			if err := requestCircleci(ciToken, "delete_gke_cluster"); err != nil {
+			if err := requestCircleci(ciToken, "delete_gke_cluster_by_golang"); err != nil {
 				log.Printf("failed to requestCircleci: %v", err)
 			}
 			log.Println("requestCircleci successfully", ciToken)
