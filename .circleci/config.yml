@@ -263,8 +263,8 @@ jobs:
     working_directory: ~/go/src/github.com/ludwig125 # この設定によって、stepsのcheckout時にworking_directory以下にgke-stockpriceリポジトリがgit cloneされる
     environment:
       PROJECT_NAME: gke-stockprice
-      # CLUSTER_NAME: gke-stockprice-cluster-prod
       # COMPUTE_ZONE: us-central1-f
+      # CLUSTER_NAME: gke-stockprice-cluster-prod
       # MACHINE_TYPE: g1-small
       # NUM_NODES: 3 # 2だと`nodes are available: 1 Insufficient memory, 2 Insufficient cpu.` となったので
       GO_VERSION: 1.14.1
@@ -298,8 +298,8 @@ jobs:
       - run:
           name: Setup GKE Cluster Infomation
           command: |
-            gcloud config set project $PROJECT_NAME
-            gcloud config set compute/zone ${COMPUTE_ZONE}
+            gcloud config set project ${PROJECT_NAME}
+      # gcloud config set compute/zone ${COMPUTE_ZONE}
       # gcloud config set container/cluster $CLUSTER_NAME
       # gcloud container clusters get-credentials $CLUSTER_NAME
       - run:
