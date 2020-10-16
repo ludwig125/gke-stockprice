@@ -82,6 +82,18 @@ $go test -v ./... -p 1 -count=1
 go testはデフォルトではパラレルでテストを実行してしまうので、
 Mysqlのデータが競合しないように`-p 1`として並列数を１にしている
 
+## ローカル環境からcircleciジョブの実行
+
+CIRCLE_API_USER_TOKENを事前に環境変数に設定してからcurlを実行する
+
+```bash
+$CIRCLE_API_USER_TOKEN=$(cat circleci_token.txt); curl -XPOST https://circleci.com/api/v1.1/project/github/ludwig125/gke-stockprice/tree/master --user "${CIRCLE_API_USER_TOKEN}:" --header "Content-Type: application/json" -d '{
+  "build_parameters": {
+    "CIRCLE_JOB": "delete_gke_cluster_by_golang"
+  }
+}'
+```
+
 ## circleci cli
 
 cliのインストール(以下はWSL2 Ubuntu18.04でやった場合)
@@ -244,16 +256,83 @@ mysql> show tables;
 mysql>
 ```
 
-# circleciのジョブをAPIから実行
+# GCR(Google Container Registry)操作
 
-CIRCLE_API_USER_TOKENを事前に環境変数に設定してからcurlを実行する
+事前にdockerのインストールが必要
 
-```bash
-$ CIRCLE_API_USER_TOKEN=$(cat circleci_token.txt); curl -XPOST https://circleci.com/api/v1.1/project/github/ludwig125/gke-stockprice/tree/master --user "${CIRCLE_API_USER_TOKEN}:" --header "Content-Type: application/json" -d '{
-  "build_parameters": {
-    "CIRCLE_JOB": "create_gke_cluster"
-  }
-}'
+## dockerインストール
+
+#### install手順
+
+- [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+
+#### 実行するコマンド
+
+```
+$sudo apt-get remove docker docker-engine docker.io containerd runc
+
+$curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+
+$sudo apt-key fingerprint 0EBFCD88
+
+$ sudo add-apt-repository \
+   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+   $(lsb_release -cs) \
+   stable"
+
+$ sudo apt-get install docker-ce docker-ce-cli containerd.io
+```
+
+#### docker daemonの起動
+
+WindowsTerminalをWindowsキーから「管理者として実行」で起動して、
+
+![image](https://user-images.githubusercontent.com/18366858/92527936-d73c6e00-f262-11ea-992e-6425a2e3610c.png)
+
+以下のコマンドで実行できる
+
+```
+$sudo cgroupfs-mount
+$sudo service docker start
+ * Starting Docker: docker                                                                                       [ OK ]
+$sudo service docker status
+ * Docker is running
+```
+
+## GCR認証と操作
+
+#### 認証
+
+```
+$gcloud auth activate-service-account --key-file gke-stockprice-serviceaccount.json
+$gcloud --quiet auth configure-docker
+```
+
+#### 操作
+
+参考
+
+- [イメージの管理](https://cloud.google.com/container-registry/docs/managing?hl=ja#gcloud)
+
+imageのリスト確認
+
+```
+$gcloud container images list --repository=us.gcr.io/gke-stockprice
+NAME
+us.gcr.io/gke-stockprice/gke-nikkei-mock
+us.gcr.io/gke-stockprice/gke-stockprice
+```
+
+imageのバージョン確認
+
+```
+$gcloud container images list-tags us.gcr.io/gke-stockprice/gke-stockprice
+DIGEST        TAGS        TIMESTAMP
+00a6fea8576d  545,latest  2020-09-08T05:51:03
+75e258c78aba  535         2020-09-06T07:56:57
+158288fd1824  528         2020-09-05T07:44:31
+cad4c1d14522  524         2020-09-05T07:01:55
+略
 ```
 
 # GKE操作
