@@ -259,6 +259,74 @@ jobs:
           name: Kustomize build and Apply
           command: ./kustomize build ./k8s/overlays/prod/ | kubectl apply -f -
 
+  create_gke_cluster_and_deploy_by_golang:
+    working_directory: ~/go/src/github.com/ludwig125 # この設定によって、stepsのcheckout時にworking_directory以下にgke-stockpriceリポジトリがgit cloneされる
+    environment:
+      PROJECT_NAME: gke-stockprice
+      # CLUSTER_NAME: gke-stockprice-cluster-prod
+      # COMPUTE_ZONE: us-central1-f
+      # MACHINE_TYPE: g1-small
+      # NUM_NODES: 3 # 2だと`nodes are available: 1 Insufficient memory, 2 Insufficient cpu.` となったので
+      GO_VERSION: 1.14.1
+    docker:
+      - image: google/cloud-sdk # kubectlを使うのでalpineではない
+    steps:
+      - checkout
+      - run:
+          name: Install wget
+          command: |
+            apt-get install -y wget
+      - run:
+          name: Install go
+          command: |
+            wget https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz
+            tar -C /usr/local -xzf go$GO_VERSION.linux-amd64.tar.gz
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
+            source $BASH_ENV
+            go version
+      - run:
+          name: Install kustomize
+          # ref. https://github.com/kubernetes-sigs/kustomize/blob/master/docs/INSTALL.md#quickly-curl-the-latest-binary
+          command: |
+            curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+            ./kustomize version
+      - run:
+          name: Setup GKE Cluster Infomation
+          command: |
+            gcloud config set project $PROJECT_NAME
+      #      gcloud config set compute/zone ${COMPUTE_ZONE}
+      # - run:
+      #     name: Activate Service Account
+      #     command: |
+      #       echo $GCLOUD_SERVICE_KEY | base64 -di > gke-stockprice-serviceaccount.json
+      #       gcloud auth activate-service-account --key-file gke-stockprice-serviceaccount.json
+      #       - run:
+      #         name: Setup GKE Cluster Infomation
+      #         command: |
+      #           gcloud config set project $PROJECT_NAME
+      #           gcloud config set container/cluster $CLUSTER_NAME
+      #           gcloud config set compute/zone ${COMPUTE_ZONE}
+      #           gcloud container clusters get-credentials $CLUSTER_NAME
+      - run:
+          name: Create config & secret
+          command: |
+            echo ${GCLOUD_SERVICE_KEY} | base64 -di > ./k8s/base/gke-stockprice-serviceaccount.json
+            echo -n ${DAILY_PRICE_URL} > ./k8s/overlays/prod/daily_price_url.txt
+            echo -n ${PROD_DB_USERNAME} > ./k8s/overlays/prod/db_username.txt
+            echo -n ${PROD_DB_PASSWORD} > ./k8s/overlays/prod/db_password.txt
+            echo -n ${PROD_SHEET_ID} > ./k8s/overlays/prod/sheetid.txt
+            echo -n ${SLACK_TOKEN} > ./k8s/overlays/prod/slack_token.txt
+            echo -n ${SLACK_CHANNEL} > ./k8s/overlays/prod/slack_channel.txt
+            echo -n ${CIRCLE_API_USER_TOKEN} > ./k8s/overlays/prod/circleci_token.txt
+            echo -n ${GMAIL} > ./k8s/overlays/prod/gmail.txt
+      - run:
+          name: Create GKE Cluster And Deploy
+          command: |
+            export CREDENTIAL_FILEPATH=gke-stockprice-serviceaccount.json
+            export DRIVE_FOLDER_NAME=gke-stockprice-dump
+            export DRIVE_PERMISSION_GMAIL=${GMAIL}
+            go run cmd/create_cluster_and_deploy/create_cluster_and_deploy.go
+
   delete_gke_cluster:
     working_directory: ~/go/src/github.com/ludwig125
     environment:
@@ -308,8 +376,8 @@ jobs:
     working_directory: ~/go/src/github.com/ludwig125
     environment:
       PROJECT_NAME: gke-stockprice
-      CLUSTER_NAME: gke-stockprice-cluster-prod
-      COMPUTE_ZONE: us-central1-f
+      # CLUSTER_NAME: gke-stockprice-cluster-prod
+      # COMPUTE_ZONE: us-central1-f
       GO_VERSION: 1.14.1
     docker:
       - image: google/cloud-sdk # kubectlを使うのでalpineではない
@@ -332,6 +400,9 @@ jobs:
           command: |
             echo $GCLOUD_SERVICE_KEY | base64 -di > gke-stockprice-serviceaccount.json
             gcloud auth activate-service-account --key-file gke-stockprice-serviceaccount.json
+      - run:
+          name: Setup GKE Cluster Infomation
+          command: |
             gcloud config set project $PROJECT_NAME
       - run:
           name: Delete GKE Cluster
