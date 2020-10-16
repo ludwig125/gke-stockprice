@@ -56,7 +56,7 @@ func TestGKEStockPrice(t *testing.T) {
 		ComputeZone: "us-central1-f",
 		MachineType: "g1-small",
 		DiskSize:    10,
-		NumNodes:    4,
+		NumNodes:    3,
 		Preemptible: "on",
 	}
 	cluster, err := gke.NewCluster(clusterConfig)
