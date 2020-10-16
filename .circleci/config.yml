@@ -291,22 +291,17 @@ jobs:
             curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
             ./kustomize version
       - run:
+          name: Activate Service Account
+          command: |
+            echo $GCLOUD_SERVICE_KEY | base64 -di > gke-stockprice-serviceaccount.json
+            gcloud auth activate-service-account --key-file gke-stockprice-serviceaccount.json
+      - run:
           name: Setup GKE Cluster Infomation
           command: |
             gcloud config set project $PROJECT_NAME
-      #      gcloud config set compute/zone ${COMPUTE_ZONE}
-      # - run:
-      #     name: Activate Service Account
-      #     command: |
-      #       echo $GCLOUD_SERVICE_KEY | base64 -di > gke-stockprice-serviceaccount.json
-      #       gcloud auth activate-service-account --key-file gke-stockprice-serviceaccount.json
-      #       - run:
-      #         name: Setup GKE Cluster Infomation
-      #         command: |
-      #           gcloud config set project $PROJECT_NAME
-      #           gcloud config set container/cluster $CLUSTER_NAME
-      #           gcloud config set compute/zone ${COMPUTE_ZONE}
-      #           gcloud container clusters get-credentials $CLUSTER_NAME
+            gcloud config set compute/zone ${COMPUTE_ZONE}
+      # gcloud config set container/cluster $CLUSTER_NAME
+      # gcloud container clusters get-credentials $CLUSTER_NAME
       - run:
           name: Create config & secret
           command: |
