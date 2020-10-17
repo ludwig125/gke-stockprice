@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net/http"
 )
 
 func requestCircleci(token, job string) error {
+	log.Printf("trigger circleci job: '%s'", job)
 	// 参考
 	// https://circleci.com/docs/ja/2.0/api-job-trigger/
 	// https://circleci.com/docs/api/#trigger-a-new-job
@@ -30,5 +32,6 @@ func requestCircleci(token, job string) error {
 	// レスポンス本文が見たい場合はここのコメントアウトを外す
 	// body, err := ioutil.ReadAll(resp.Body)
 	// fmt.Println(string(body))
+	log.Println("requestCircleci successfully", job)
 	return nil
 }

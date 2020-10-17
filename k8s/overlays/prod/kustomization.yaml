@@ -15,7 +15,7 @@ configMapGenerator:
   literals:
   - ENV=prod
   - DEBUG=off
-  - DELETE_GKE_CLUSTER=on
+  - DELETE_GKE_CLUSTER_JOB=delete_gke_cluster_by_golang
   - SEND_SLACK_MESSAGE=on
   - CHECK_DAYOFF=on
   - SCRAPE_TIMEOUT=10000
