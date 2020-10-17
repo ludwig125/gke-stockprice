@@ -14,7 +14,6 @@ configMapGenerator:
 - name: stockprice-configmap
   literals:
   - DEBUG=on
-  - DELETE_GKE_CLUSTER=off
   - SEND_SLACK_MESSAGE=off
   - CHECK_DAYOFF=off
   - SCRAPE_TIMEOUT=1000
