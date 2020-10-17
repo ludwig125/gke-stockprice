@@ -39,13 +39,14 @@ func getLocation() *time.Location {
 func main() {
 	start := time.Now()
 	log.Println("start:", start)
-	if os.Getenv("DELETE_GKE_CLUSTER") == "on" {
+	if job := os.Getenv("DELETE_GKE_CLUSTER_JOB"); job != "" {
+		log.Println("circleci target DELETE_GKE_CLUSTER_JOB:", job)
 		ciToken := mustGetenv("CIRCLE_API_USER_TOKEN")
 		defer func() {
-			if err := requestCircleci(ciToken, "delete_gke_cluster_by_golang"); err != nil {
-				log.Printf("failed to requestCircleci: %v", err)
+			if err := requestCircleci(ciToken, job); err != nil {
+				log.Printf("failed to requestCircleci: %v. job:%s", err, job)
+				return
 			}
-			log.Println("requestCircleci successfully", ciToken)
 		}()
 	}
 
