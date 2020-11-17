@@ -36,7 +36,7 @@ func NewCommandResultUpload(srv *drive.Service, cmd string, fileInfo FileInfo) (
 }
 
 func getShell() (string, error) {
-	// shellを取得する。alpineではash
+	// shellを取得する。alpineではash. ubuntuではbash
 	for _, sh := range []string{"bash", "ash"} {
 		// errを確認すると、whichでbashが見つからないとエラーが返るので無視する
 		out, _ := exec.Command("which", sh).Output()

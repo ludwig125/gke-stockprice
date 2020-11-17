@@ -77,7 +77,7 @@ func (g CalculateGrowthTrend) printGrowthTrendsToSheet(ctx context.Context, tren
 	first := 0
 	for _, t := range ts {
 		//fmt.Println("trend", trend)
-		if first == 0 {
+		if first == 0 { // spreadsheetの最初の行にはカラム名を記載する
 			ss = append(ss, t.ColumnName())
 			first++
 		}
@@ -102,12 +102,12 @@ func (i trendInfo) ColumnName() []string {
 		"code",
 		"date",
 		"trend",
-		"M5",
-		"M20",
-		"M60",
-		"M100",
-		"beforePreviousClose",
-		"previousClose",
+		// "M5",
+		// "M20",
+		// "M60",
+		// "M100",
+		// "beforePreviousClose",
+		// "previousClose",
 		"increaseRate",
 		"crossMovingAvg5",
 	}
@@ -117,15 +117,15 @@ func (i trendInfo) ColumnName() []string {
 func (i trendInfo) Slice() []string {
 	return []string{
 		i.code,
-		strings.Replace(i.date, "/", "", -1), // 日付のスラッシュをハイフンに置き換え
+		strings.Replace(i.date, "/", "", -1), // 日付に含まれるスラッシュを削る
 		i.longTrend.trend.String(),
-		fmt.Sprintf("%g", i.longTrend.movingAvgs.M5),
-		fmt.Sprintf("%g", i.longTrend.movingAvgs.M20),
-		fmt.Sprintf("%g", i.longTrend.movingAvgs.M60),
-		fmt.Sprintf("%g", i.longTrend.movingAvgs.M100),
-		fmt.Sprintf("%g", i.shortTrend.beforePreviousClose),
-		fmt.Sprintf("%g", i.shortTrend.previousClose),
-		fmt.Sprintf("%g", i.shortTrend.increaseRate),
+		// fmt.Sprintf("%g", i.longTrend.movingAvgs.M5),
+		// fmt.Sprintf("%g", i.longTrend.movingAvgs.M20),
+		// fmt.Sprintf("%g", i.longTrend.movingAvgs.M60),
+		// fmt.Sprintf("%g", i.longTrend.movingAvgs.M100),
+		// fmt.Sprintf("%g", i.shortTrend.beforePreviousClose),
+		// fmt.Sprintf("%g", i.shortTrend.previousClose),
+		fmt.Sprintf("%.4g", i.shortTrend.increaseRate),
 		fmt.Sprintf("%t", i.shortTrend.crossMovingAvg5),
 	}
 }
