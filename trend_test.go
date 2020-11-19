@@ -176,23 +176,13 @@ func TestGrowthTrend(t *testing.T) {
 		t.Error(err)
 	}
 
-	// for _, v := range dailyData {
-	// 	fmt.Println("this:", time.Now()) // TODO
-	// 	if err := db.InsertDB("daily", v); err != nil {
-	// 		t.Error(err)
-	// 	}
-	// 	if err := db.InsertDB("movingavg", makeMovingAvgDataFromDailyTestData(v)); err != nil {
-	// 		t.Error(err)
-	// 	}
-	// }
-
 	tests := map[string]struct {
 		targetDate string
 		wantCode   []string
 	}{
 		"success": {
 			targetDate: "2020/03/05",
-			wantCode:   []string{"1015", "1014", "1011", "1017", "1013", "1012", "1016"},
+			wantCode:   []string{"1015", "1011", "1014", "1013", "1012", "1017", "1016"},
 		},
 	}
 	for name, tc := range tests {
