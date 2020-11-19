@@ -328,7 +328,7 @@ func checkTestDataInSheet(ctx context.Context, sheet sheet.Sheet) error {
 		//fmt.Println("got:", got)
 		var gotCodes []string
 		for i, l := range got {
-			if i == 0 {
+			if i == 0 { // スプレッドシートの最初の行は項目名なので無視する
 				continue
 			}
 			if len(l) > 0 {
@@ -336,6 +336,8 @@ func checkTestDataInSheet(ctx context.Context, sheet sheet.Sheet) error {
 			}
 		}
 		wantCodes := []string{"1802", "2587", "3382", "4684", "5105", "6506", "6758", "7201", "8058", "9432"}
+
+		// 順序は気にせず比較するためにソートする
 		sort.Slice(gotCodes, func(i, j int) bool { return gotCodes[i] < gotCodes[j] })
 		if !reflect.DeepEqual(gotCodes, wantCodes) {
 			return fmt.Errorf("gotCodes: %v, wantCodes: %v", gotCodes, wantCodes)
