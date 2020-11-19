@@ -103,7 +103,7 @@ type trendInfo struct {
 func (i trendInfo) ColumnName() []string {
 	return []string{
 		"code",
-		"date",
+		// "date",
 		"trend",
 		// "M5",
 		// "M20",
