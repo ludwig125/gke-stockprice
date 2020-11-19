@@ -68,17 +68,20 @@ func (g CalculateGrowthTrend) printGrowthTrendsToSheet(ctx context.Context, tren
 	for trend := range trends {
 		ts = append(ts, trend)
 	}
-	// trend順にソート
-	sort.SliceStable(ts, func(i, j int) bool { return ts[i].longTrend.trend > ts[j].longTrend.trend })
 	// increaseRate順にソート
 	sort.SliceStable(ts, func(i, j int) bool { return ts[i].shortTrend.increaseRate > ts[j].shortTrend.increaseRate })
+
+	// increaseRate順をなるべく保ちつつ、trend順にソート
+	sort.SliceStable(ts, func(i, j int) bool { return ts[i].longTrend.trend > ts[j].longTrend.trend })
 
 	var ss [][]string
 	first := 0
 	for _, t := range ts {
-		//fmt.Println("trend", trend)
 		if first == 0 { // spreadsheetの最初の行にはカラム名を記載する
-			ss = append(ss, t.ColumnName())
+			// 日付はみんな同じなので最初の行だけに出力させる。カラム名の一番後続につける
+			date := strings.Replace(t.date, "/", "", -1) // 日付に含まれるスラッシュを削る
+			topLine := append(t.ColumnName(), date)
+			ss = append(ss, topLine)
 			first++
 		}
 		ss = append(ss, t.Slice())
@@ -117,7 +120,7 @@ func (i trendInfo) ColumnName() []string {
 func (i trendInfo) Slice() []string {
 	return []string{
 		i.code,
-		strings.Replace(i.date, "/", "", -1), // 日付に含まれるスラッシュを削る
+		// strings.Replace(i.date, "/", "", -1), // 日付に含まれるスラッシュを削る
 		i.longTrend.trend.String(),
 		// fmt.Sprintf("%g", i.longTrend.movingAvgs.M5),
 		// fmt.Sprintf("%g", i.longTrend.movingAvgs.M20),
