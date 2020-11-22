@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 
 	"golang.org/x/oauth2/google" // to get sheet client
@@ -127,7 +128,118 @@ func (s SpreadSheet) Clear() error {
 	if status != 200 {
 		return fmt.Errorf("HTTPstatus error. %v", status)
 	}
+	// 1000行を超えるセルはClearの際に削除して余計な空白セルを増大させないようにする
+	if err := s.deleteRowMoreThan(1000); err != nil {
+		return fmt.Errorf("failed to deleteRowMoreThan: %w", err)
+	}
 	return nil
+}
+
+// Spreadsheets.Values.Appendを繰り返すと行が増えていく一方なので、rowThresHold行を超えないように削減するためのメソッド
+// あまりにも空のセルが増えると、以下のエラーがでてそれ以上書き込めなくなる
+// -> This action would increase the number of cells in the workbook above the limit of 5000000 cells., badRequest
+// 参考：https://stackoverflow.com/questions/61590412/deleting-empty-cells-from-google-spreadsheet-programatically-to-avoid-5000000-ce
+func (s SpreadSheet) deleteRowMoreThan(rowThresHold int64) error {
+	sheetProperties, err := s.getSheetProperties()
+	if err != nil {
+		return fmt.Errorf("failed to getSheetID: %v", err)
+	}
+	rowCount := sheetProperties.GridProperties.RowCount
+	columnCount := sheetProperties.GridProperties.ColumnCount
+	log.Printf("SpreadsheetID: %s, ReadRange: %s, RowCount: %d, ColumnCount: %d", s.SpreadsheetID, s.ReadRange, rowCount, columnCount)
+	if rowCount <= rowThresHold {
+		// 行数がrowThresHoldを超えていなければ何もしないで終わる
+		log.Printf("RowCount: %d is not more than %d, no need to delete rows", rowCount, rowThresHold)
+		return nil
+	}
+	// TODO: rowCountとrowThresHoldのアラート出してもいいかも
+	log.Printf("RowCount: %d is over rowThresHold: %d, delete rows", rowCount, rowThresHold)
+
+	req := sheets.Request{
+		DeleteDimension: &sheets.DeleteDimensionRequest{
+			Range: &sheets.DimensionRange{
+				Dimension:  "ROWS",
+				StartIndex: rowThresHold, // spreadsheetの番号でthresHold+1行目以降を削除する。thresHoldが10なら11行目以降を削除する
+				EndIndex:   rowCount,     // rowCountまでを削除する
+				SheetId:    sheetProperties.SheetId,
+			},
+		},
+	}
+	rb := &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: []*sheets.Request{&req},
+	}
+
+	resp, err := s.Service.Spreadsheets.BatchUpdate(s.SpreadsheetID, rb).Do()
+	if err != nil {
+		return fmt.Errorf("unable to BatchUpdate: %v, rowThresHold: %d", err, rowThresHold)
+	}
+	status := resp.ServerResponse.HTTPStatusCode
+	if status != 200 {
+		return fmt.Errorf("HTTPstatus error. %v", status)
+	}
+	return nil
+}
+
+// propertiesの中身: https://developers.google.com/sheets/api/samples/sheet#determine_sheet_id_and_other_properties
+func (s SpreadSheet) getSheetProperties() (*sheets.SheetProperties, error) {
+	spreadSheet, err := s.getSpreadsheet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to getSpreadsheet: %v", err)
+	}
+
+	// spreadsheetのsheetIDなどを取得する
+	// spreadsheetidとsheetidは別物なので注意
+	// https://stackoverflow.com/questions/46696168/google-sheets-api-addprotectedrange-error-no-grid-with-id-0
+	/*
+		ref: https://developers.google.com/sheets/api/samples/sheet#determine_sheet_id_and_other_properties
+			{
+			"sheets": [
+				{
+				"properties": {
+					"sheetId": 867266606,
+					"title": "Sheet1",
+					"index": 0,
+					"sheetType": "GRID",
+					"gridProperties": {
+					"rowCount": 100,
+					"columnCount": 20,
+					"frozenRowCount": 1
+					}
+					"tabColor": {
+					"blue": 1.0
+					}
+				},
+				...
+			],
+			}
+	*/
+	var sheetTitles []string
+	for _, sheet := range spreadSheet.Sheets {
+		sheetTitles = append(sheetTitles, sheet.Properties.Title)
+		if sheet.Properties.Title == s.ReadRange {
+			return sheet.Properties, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to match sheet title. SpreadsheetID: %s, ReadRange: %s, sheet titles: %v", s.SpreadsheetID, s.ReadRange, sheetTitles)
+}
+
+func (s SpreadSheet) getSpreadsheet() (*sheets.Spreadsheet, error) {
+	// IncludeGridDataをTrueにすると、SpreadsheetのSheetの行数、列数なども取得できる
+	// ref: https://developers.google.com/sheets/api/samples/sheet#determine_sheet_id_and_other_properties
+	// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets#sheetproperties
+	// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/get
+
+	// Rangesメソッドでシートの絞り込みをしないとSpreadsheet内の全シートの情報が得られる
+	includeGridData := true
+	resp, err := s.Service.Spreadsheets.Get(s.SpreadsheetID).Ranges(s.ReadRange).IncludeGridData(includeGridData).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get spreadsheet: %v, sheetID: %s, readRange: %s", err, s.SpreadsheetID, s.ReadRange)
+	}
+	status := resp.ServerResponse.HTTPStatusCode
+	if status != 200 {
+		return nil, fmt.Errorf("error HTTPstatus: %v", status)
+	}
+	return resp, nil
 }
 
 // sheetService, sheetID, sheet名, 入力データを引数に取り、SpreadSheetに記入する
@@ -160,57 +272,3 @@ func interfaceSlices(sss [][]string) [][]interface{} {
 	}
 	return iss
 }
-
-// func clear(srv *sheets.Service, sid, srange string) error {
-// 	resp, err := srv.Spreadsheets.Values.Clear(sid, srange, &sheets.ClearValuesRequest{}).Do()
-// 	if err != nil {
-// 		return fmt.Errorf("unable to clear value. %v", err)
-// 	}
-// 	status := resp.ServerResponse.HTTPStatusCode
-// 	if status != 200 {
-// 		return fmt.Errorf("HTTPstatus error. %v", status)
-// 	}
-// 	return nil
-// }
-
-// func Read(r *http.Request, srv *sheets.Service, sheetID string, readRange string) [][]interface{} {
-// 	ctx := appengine.NewContext(r)
-
-// 	var MaxRetries = 3
-// 	attempt := 0
-// 	for {
-// 		// MaxRetries を超えていたらnilを返す
-// 		if attempt >= MaxRetries {
-// 			log.Errorf(ctx, "Failed to retrieve data from sheet. attempt: %d. reached MaxRetries!", attempt)
-// 			return nil
-// 		}
-// 		attempt = attempt + 1
-// 		// stockpriceシートからデータを取得
-// 		resp, err := srv.Spreadsheets.Values.Get(sheetID, readRange).Do()
-// 		if err != nil {
-// 			log.Warningf(ctx, "Unable to retrieve data from sheet: %v. attempt: %d", err, attempt)
-// 			time.Sleep(1 * time.Second) // 1秒待つ
-// 			continue
-// 		}
-// 		status := resp.ServerResponse.HTTPStatusCode
-// 		if status != 200 {
-// 			log.Warningf(ctx, "HTTPstatus error: %v. attempt: %d", status, attempt)
-// 			time.Sleep(1 * time.Second) // 1秒待つ
-// 			continue
-// 		}
-// 		return resp.Values
-// 	}
-// }
-
-// func clearSheet(srv *sheets.Service, sid string, sname string) error {
-// 	// clear stockprice rate spreadsheet:
-// 	resp, err := srv.Spreadsheets.Values.Clear(sid, sname, &sheets.ClearValuesRequest{}).Do()
-// 	if err != nil {
-// 		return fmt.Errorf("Unable to clear value. %v", err)
-// 	}
-// 	status := resp.ServerResponse.HTTPStatusCode
-// 	if status != 200 {
-// 		return fmt.Errorf("HTTPstatus error. %v", status)
-// 	}
-// 	return nil
-// }
