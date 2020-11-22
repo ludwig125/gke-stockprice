@@ -69,6 +69,7 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 			var e error
 			failedCodes, e = sp.saveStockPrice(ctx, fcodes, now())                                    // ここで改めてfailedCodesが上書きされる
 			st.InsertStatus(fmt.Sprintf("saveStockPrice_retry%d", retryCnt), now(), now().Sub(start)) // now().Sub(start)で所要時間も入れておく
+			log.Printf("retry: %d. updated failedCodes: %v, error: %v", retryCnt, failedCodes, e)
 			return e
 		}); err != nil {
 			// retry 時のエラーはログに出すだけにしておく
