@@ -33,7 +33,7 @@ func TestSheet(t *testing.T) {
 	if err := ts.Update(testdata); err != nil {
 		t.Error(err)
 	}
-	// testdata２つ分追加で書き込む
+	// 同じtestdataを３つ分書き込む
 	if err := ts.Insert(append(testdata, testdata...)); err != nil {
 		t.Error(err)
 	}
@@ -54,7 +54,7 @@ func TestSheet(t *testing.T) {
 	}
 
 	// データを削除する
-	if err := ts.Update([][]string{}); err != nil {
+	if err := ts.Clear(); err != nil {
 		t.Error(err)
 	}
 	got, err = ts.Read()
@@ -75,81 +75,3 @@ func mustGetenv(t *testing.T, k string) string {
 	}
 	return v
 }
-
-// func TestRead(t *testing.T) {
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	defer cancel()
-
-// 	sheetCredential := mustGetenv("CREDENTIAL_FILEPATH")
-// 	// spreadsheetのserviceを取得
-// 	srv, err := GetSheetClient(ctx, sheetCredential)
-// 	if err != nil {
-// 		t.Fatalf("failed to get sheet service. err: %v", err)
-// 	}
-// 	log.Println("succeeded to get sheet service")
-
-// 	testSheetID := mustGetenv("INTEGRATION_TEST_SHEETID")
-// 	t.Run("testSheet", func(t *testing.T) {
-// 		testHolidaySheet(t, srv, testSheetID)
-// 		testCodeSheet(t, srv, testSheetID)
-// 	})
-// }
-
-// func testHolidaySheet(t *testing.T, srv *sheets.Service, sid string) {
-// 	si := SpreadSheet{Service: srv,
-// 		SpreadsheetID: sid,
-// 		ReadRange:     "holiday",
-// 	}
-// 	resp, err := si.Read()
-// 	if err != nil {
-// 		t.Fatalf("failed to ReadSheet: %v", err)
-// 	}
-// 	t.Log(resp[0][0])
-// 	for _, v := range resp {
-// 		t.Log(v[0])
-// 	}
-// }
-
-// func testCodeSheet(t *testing.T, srv *sheets.Service, sid string) {
-// 	si := SpreadSheet{
-// 		Service:       srv,
-// 		SpreadsheetID: sid,
-// 		ReadRange:     "tse-first",
-// 	}
-// 	resp, err := si.Read()
-// 	if err != nil {
-// 		t.Fatalf("failed to ReadSheet: %v", err)
-// 	}
-// 	log.Println(resp[0][0])
-// 	t.Log("res", resp[0][0])
-// 	os.Exit(0)
-// 	for _, v := range resp {
-// 		t.Log(v[0])
-// 	}
-// }
-
-// func TestUpdate(t *testing.T) {
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	defer cancel()
-
-// 	sheetCredential := mustGetenv("CREDENTIAL_FILEPATH")
-// 	// spreadsheetのserviceを取得
-// 	srv, err := GetSheetClient(ctx, sheetCredential)
-// 	if err != nil {
-// 		t.Fatalf("failed to get sheet service. err: %v", err)
-// 	}
-// 	log.Println("succeeded to get sheet service")
-// 	sid := mustGetenv("INTEGRATION_TEST_SHEETID")
-
-// 	si := SpreadSheet{
-// 		Service:       srv,
-// 		SpreadsheetID: sid,
-// 		ReadRange:     "sample",
-// 	}
-// 	data := [][]string{
-// 		[]string{"a", "b"},
-// 		[]string{"c", "d"},
-// 	}
-
-// 	si.Update(data)
-// }
