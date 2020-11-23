@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,13 +23,17 @@ type CalculateGrowthTrend struct {
 }
 
 func (g CalculateGrowthTrend) growthTrend(ctx context.Context, codes []string) error {
+	log.Println("gather trendInfo...")
 	trends, err := g.gatherTrendInfo(ctx, codes)
 	if err != nil {
 		return fmt.Errorf("failed to get gatherTrendInfo: %w", err)
 	}
+	log.Println("gathered trendInfo successfully")
+	log.Println("try to printGrowthTrendsToSheet")
 	if err := g.printGrowthTrendsToSheet(ctx, trends); err != nil {
 		return fmt.Errorf("failed to printGrowthTrendsToSheet: %w", err)
 	}
+	log.Println("printGrowthTrendsToSheet successfully")
 	return nil
 }
 
