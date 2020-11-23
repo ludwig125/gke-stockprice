@@ -301,7 +301,7 @@ func checkTestDataInDB(ctx context.Context, databaseName string) error {
 		return fmt.Errorf("failed to SelectDB: %v", err)
 	}
 	log.Println("SHOW DATABASES:", ret)
-	if err := retry.WithContext(ctx, 20, 10*time.Second, func() error {
+	if err := retry.WithContext(ctx, 30, 10*time.Second, func() error {
 		// tableに格納されたcodeの数を確認
 		retCodes, err := db.SelectDB("SELECT DISTINCT code FROM daily")
 		if err != nil {

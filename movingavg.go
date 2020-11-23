@@ -181,7 +181,7 @@ func recentCloses(db database.DB, code string, limit int) (DateCloses, error) {
 		limitStr = fmt.Sprintf("LIMIT %d", limit)
 	}
 	q := fmt.Sprintf("SELECT date, close FROM daily WHERE code = '%v' ORDER BY date DESC %s;", code, limitStr)
-	log.Println("query:", q)
+	// log.Println("query:", q)
 	res, err := db.SelectDB(q)
 	if err != nil {
 		return nil, fmt.Errorf("failed to selectTable %v", err)
