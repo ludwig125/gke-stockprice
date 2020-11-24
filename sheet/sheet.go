@@ -128,8 +128,8 @@ func (s SpreadSheet) Clear() error {
 	if status != 200 {
 		return fmt.Errorf("HTTPstatus error. %v", status)
 	}
-	// 1000行を超えるセルはClearの際に削除して余計な空白セルを増大させないようにする
-	if err := s.deleteRowMoreThan(1000); err != nil {
+	// 10000行を超えるセルはClearの際に削除して余計な空白セルを増大させないようにする
+	if err := s.deleteRowMoreThan(10000); err != nil {
 		return fmt.Errorf("failed to deleteRowMoreThan: %w", err)
 	}
 	return nil
