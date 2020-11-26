@@ -47,15 +47,15 @@ func GetFolderIDOrCreate(srv *drive.Service, folderName, permissionTargetGmail s
 
 // getFolderID returns folder id.
 func getFolderID(srv *drive.Service, folderName string) (string, error) {
-	return getObjectID(srv, folderName, "application/vnd.google-apps.folder", "folder")
+	return getObjectID(srv, folderName, "application/vnd.google-apps.folder", "folder", "")
 }
 
 // getFileID returns file id.
-func getFileID(srv *drive.Service, fileName, mimeType string) (string, error) {
-	return getObjectID(srv, fileName, mimeType, "file")
+func getFileID(srv *drive.Service, fileName, mimeType, parentID string) (string, error) {
+	return getObjectID(srv, fileName, mimeType, "file", parentID)
 }
 
-func getObjectID(srv *drive.Service, name, mimeType, objectType string) (string, error) {
+func getObjectID(srv *drive.Service, name, mimeType, objectType, parentID string) (string, error) {
 	if name == "" {
 		return "", fmt.Errorf("%s name is empty", objectType)
 	}
@@ -63,6 +63,9 @@ func getObjectID(srv *drive.Service, name, mimeType, objectType string) (string,
 	// Qの指定対象はここで調べる：https://developers.google.com/drive/api/v3/reference/files
 	// 検索方法参考: https://developers.google.com/drive/api/v3/search-files
 	q := fmt.Sprintf(`name="%s" and mimeType="%s"`, name, mimeType)
+	if parentID != "" {
+		q += fmt.Sprintf(` and "%s" in parents`, parentID)
+	}
 
 	r, err := srv.Files.List().
 		// Fields("nextPageToken, files(id, name)").
@@ -151,7 +154,7 @@ func UploadFile(srv *drive.Service, content io.Reader, fi FileInfo) error {
 	progressUpdater := func(current, total int64) { log.Printf("%dB / %dB total\n", current, total) }
 
 	log.Println("start upload")
-	fileID, err := getFileID(srv, fi.Name, fi.MimeType)
+	fileID, err := getFileID(srv, fi.Name, fi.MimeType, fi.ParentID)
 	if err != nil {
 		return fmt.Errorf("failed to getFileID, target file: %s. mimeType: %s, err: %v", fi.Name, fi.MimeType, err)
 	}
@@ -159,7 +162,7 @@ func UploadFile(srv *drive.Service, content io.Reader, fi FileInfo) error {
 	// overwriteがtrueでfileIDが空でなければ（すでにあれば）上書きする
 	// そうでないのなら新規作成
 	if fi.Overwrite && fileID != "" {
-		log.Println("overwrite target:", fi.Name, fileID)
+		log.Printf("overwrite target: Name: %s, ID: %s, parentID: %s", fi.Name, fileID, fi.ParentID)
 		f := &drive.File{Name: fi.Name, Description: fi.Description, MimeType: fi.MimeType}
 		// Updateメソッドを使うときはAddParentsでparentsを指定しないと以下のエラーになる
 		// googleapi: Error 403: The parents field is not directly writable in update requests. Use the addParents and removeParents parameters instead., fieldNotWritable
