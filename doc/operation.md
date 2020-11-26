@@ -130,6 +130,25 @@ $which kustomize
 $sh local_kustomize_check_prod.sh
 ```
 
+# integration_test
+
+事前に以下のようなSpreadsheetを用意しておく必要がある
+
+![image](https://user-images.githubusercontent.com/18366858/100282407-e05df100-2fae-11eb-8982-17b4542a5f30.png)
+![image](https://user-images.githubusercontent.com/18366858/100282419-e94ec280-2fae-11eb-98d2-c14344e660eb.png)
+![image](https://user-images.githubusercontent.com/18366858/100282444-f1a6fd80-2fae-11eb-8cb2-0623d679a803.png)
+![image](https://user-images.githubusercontent.com/18366858/100282459-f8ce0b80-2fae-11eb-8af6-85f795c8e5f2.png)
+![image](https://user-images.githubusercontent.com/18366858/100282475-02f00a00-2faf-11eb-8675-2c699ec5ca75.png)
+
+これらはそれぞれkustomization.yamlで指定している以下のシートに対応する
+```
+  - HOLIDAY_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
+  - COMPANYCODE_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
+  - TREND_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
+  - STATUS_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
+```
+
+- unittestはsheet_test.goで指定している`INTEGRATION_TEST_SHEETID`がこのシートに対応する
 
 # 本番CloudSQL
 

@@ -243,7 +243,7 @@ func (sp DailyStockPrice) fetch(ctx context.Context, code string) (*goquery.Docu
 	if err != nil {
 		return nil, fmt.Errorf("failed to load html doc. err: %v", err)
 	}
-	log.Printf("fetched daily stockprice successfully. code: %s", code)
+	// log.Printf("fetched daily stockprice successfully. code: %s", code)
 	return doc, nil
 }
 
