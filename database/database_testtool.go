@@ -116,6 +116,15 @@ func createTestTable(db *sql.DB) error {
         moving60 DOUBLE,
         moving100 DOUBLE,
         PRIMARY KEY( code, date )
+	)`,
+		`stockprice_dev.trend (
+		code VARCHAR(10) NOT NULL,
+		date VARCHAR(10) NOT NULL,
+		trend VARCHAR(15),
+		growthRate DOUBLE,
+		crossMoving5 TINYINT(1),
+		trendChange TINYINT(1),
+		PRIMARY KEY( code, date )
 	)`}
 	for _, ddl := range tables {
 		//log.Println("trying to create table", ddl)

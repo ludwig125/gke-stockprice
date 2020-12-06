@@ -23,85 +23,89 @@ type CalculateGrowthTrend struct {
 }
 
 func (g CalculateGrowthTrend) growthTrend(ctx context.Context, codes []string) error {
-	log.Println("gather trendInfo...")
-	trends, err := g.gatherTrendInfo(ctx, codes)
+	log.Println("gather trends...")
+	trends, err := g.gatherAllTrends(ctx, codes)
 	if err != nil {
-		return fmt.Errorf("failed to get gatherTrendInfo: %w", err)
+		return fmt.Errorf("failed to gatherAllTrends: %w", err)
 	}
 	log.Println("gathered trendInfo successfully")
-	log.Println("try to printGrowthTrendsToSheet")
-	if err := g.printGrowthTrendsToSheet(ctx, trends); err != nil {
-		return fmt.Errorf("failed to printGrowthTrendsToSheet: %w", err)
+
+	trendData := g.makeTrendDataForSheet(trends)
+	log.Println("try to print trend to sheet")
+	if err := g.sheet.Update(trendData); err != nil {
+		return fmt.Errorf("failed to print trend data to sheet: %w", err)
 	}
 	log.Println("printGrowthTrendsToSheet successfully")
 	return nil
 }
 
-func (g CalculateGrowthTrend) gatherTrendInfo(ctx context.Context, codes []string) (<-chan trendInfo, error) {
+func (g CalculateGrowthTrend) gatherAllTrends(ctx context.Context, codes []string) ([]trendInfo, error) {
 	eg, ctx := errgroup.WithContext(ctx)
-	trends := make(chan trendInfo, len(codes))
+	trendCh := make(chan trendInfo, len(codes))
 
 	sem := make(chan struct{}, g.calcConcurrency)
 	defer close(sem)
-	defer close(trends)
 	for _, code := range codes {
 		select {
 		case <-ctx.Done():
 			break
 		default:
 		}
-		sem <- struct{}{} // チャネルに送信
+		sem <- struct{}{}
 
 		code := code
 		eg.Go(func() error {
 			defer func() { <-sem }()
-			trend, err := g.trendInfo(code)
+			trend, err := g.getTrend(code)
 			if err != nil {
-				return fmt.Errorf("failed to get trendInfo. code: %s, err:%w", code, err)
+				return fmt.Errorf("failed to get getTrend. code: %s, err:%w", code, err)
 			}
-			//log.Println("code", code, "trend:", trend)
-			trends <- trend
+			trendCh <- trend
 			return nil
 		})
 	}
 
-	return trends, eg.Wait()
+	if err := eg.Wait(); err != nil {
+		return nil, fmt.Errorf("failed to eg.Wait: %w", err)
+	}
+	close(trendCh)
+
+	var trends []trendInfo
+	for t := range trendCh {
+		trends = append(trends, t)
+	}
+	return trends, nil
 }
 
-func (g CalculateGrowthTrend) printGrowthTrendsToSheet(ctx context.Context, trends <-chan trendInfo) error {
-	var ts []trendInfo
-	for trend := range trends {
-		ts = append(ts, trend)
-	}
+func (g CalculateGrowthTrend) makeTrendDataForSheet(trends []trendInfo) [][]string {
 	// increaseRate順にソート
-	sort.SliceStable(ts, func(i, j int) bool { return ts[i].shortTrend.increaseRate > ts[j].shortTrend.increaseRate })
+	sort.SliceStable(trends, func(i, j int) bool {
+		return trends[i].previousTrend.increaseRate > trends[j].previousTrend.increaseRate
+	})
 
 	// increaseRate順をなるべく保ちつつ、trend順にソート
-	sort.SliceStable(ts, func(i, j int) bool { return ts[i].longTrend.trend > ts[j].longTrend.trend })
+	sort.SliceStable(trends, func(i, j int) bool { return trends[i].longTrend.trend > trends[j].longTrend.trend })
 
-	var ss [][]string
+	var trendData [][]string
 	first := 0
-	for _, t := range ts {
+	for _, t := range trends {
 		if first == 0 { // spreadsheetの最初の行にはカラム名を記載する
 			// 日付はみんな同じなので最初の行だけに出力させる。カラム名の一番後続につける
 			date := strings.Replace(t.date, "/", "", -1) // 日付に含まれるスラッシュを削る
 			topLine := append(t.ColumnName(), date)
-			ss = append(ss, topLine)
+			trendData = append(trendData, topLine)
 			first++
 		}
-		ss = append(ss, t.Slice())
+		trendData = append(trendData, t.Slice())
 	}
-	if err := g.sheet.Update(ss); err != nil {
-		return fmt.Errorf("failed to sheet Update: %w", err)
-	}
-	return nil
+	return trendData
 }
 
 type trendInfo struct {
-	code       string
-	date       string
-	longTrend  longTrend
-	shortTrend shortTrend
+	code          string
+	date          string
+	longTrend     longTermTrend
+	previousTrend previousTrend
 }
 
 // ColumnName returns column name trendInfo.
@@ -131,23 +135,23 @@ func (i trendInfo) Slice() []string {
 		// fmt.Sprintf("%g", i.longTrend.movingAvgs.M20),
 		// fmt.Sprintf("%g", i.longTrend.movingAvgs.M60),
 		// fmt.Sprintf("%g", i.longTrend.movingAvgs.M100),
-		// fmt.Sprintf("%g", i.shortTrend.beforePreviousClose),
-		// fmt.Sprintf("%g", i.shortTrend.previousClose),
-		fmt.Sprintf("%.4g", i.shortTrend.increaseRate),
-		fmt.Sprintf("%t", i.shortTrend.crossMovingAvg5),
+		// fmt.Sprintf("%g", i.previousTrend.beforePreviousClose),
+		// fmt.Sprintf("%g", i.previousTrend.previousClose),
+		fmt.Sprintf("%.4g", i.previousTrend.increaseRate),
+		fmt.Sprintf("%t", i.previousTrend.crossMovingAvg5),
 	}
 }
 
-func (g CalculateGrowthTrend) trendInfo(code string) (trendInfo, error) {
-	long, err := g.longTermTrend(code)
+func (g CalculateGrowthTrend) getTrend(code string) (trendInfo, error) {
+	long, err := g.getLongTermTrend(code)
 	if err != nil {
-		return trendInfo{}, fmt.Errorf("failed to get longTermTrend: %w", err)
+		return trendInfo{}, fmt.Errorf("failed to getLongTermTrend: %w", err)
 	}
-	short, err := g.previousTrend(code, long.movingAvgs.M5)
+	short, err := g.getPreviousTrend(code, long.movingAvgs.M5)
 	if err != nil {
-		return trendInfo{}, fmt.Errorf("failed to get shortTermTrend: %w", err)
+		return trendInfo{}, fmt.Errorf("failed to getPreviousTrend: %w", err)
 	}
-	return trendInfo{code: code, date: g.targetDate, longTrend: long, shortTrend: short}, nil
+	return trendInfo{code: code, date: g.targetDate, longTrend: long, previousTrend: short}, nil
 }
 
 // Trend means stock price trend defined bellow
@@ -157,7 +161,7 @@ type Trend int
 // 3: shortTermAdvance : 5 > 20 > 60
 // 2: shortTermDecline : 60 > 20 > 5
 // 1: longTermDecline : 100 > 60 > 20 > 5
-// 0: NON : other
+// 0: non : other
 
 const (
 	non Trend = iota
@@ -180,18 +184,18 @@ type TrendMovingAvgs struct {
 	M100 float64
 }
 
-// longTrend has long term trend information.
-type longTrend struct {
+// longTermTrend has long term trend information.
+type longTermTrend struct {
 	trend      Trend
 	movingAvgs TrendMovingAvgs
 }
 
-func (g CalculateGrowthTrend) longTermTrend(code string) (longTrend, error) {
+func (g CalculateGrowthTrend) getLongTermTrend(code string) (longTermTrend, error) {
 	movingAvgs, err := g.getMovingAvgs(code, g.targetDate)
 	if err != nil {
-		return longTrend{}, fmt.Errorf("failed to getMovingAvgs: %w", err)
+		return longTermTrend{}, fmt.Errorf("failed to getMovingAvgs: %w", err)
 	}
-	return longTrend{trend: classifyTrend(movingAvgs), movingAvgs: movingAvgs}, nil
+	return longTermTrend{trend: classifyTrend(movingAvgs), movingAvgs: movingAvgs}, nil
 }
 
 // 銘柄コード、日付を渡すと該当のmovings structに対応するX日移動平均を返す
@@ -219,7 +223,7 @@ func (g CalculateGrowthTrend) getMovingAvgs(code string, date string) (TrendMovi
 
 // classifyTrend classify Trend by comparing movings
 func classifyTrend(m TrendMovingAvgs) Trend {
-	// moving5 > moving20 > moving60 > moving100の並びのときPPP
+	// moving5 > moving20 > moving60 > moving100の並びのときlongTermAdvance
 	if isLeftGreaterThanRight(m.M5, m.M20, m.M60, m.M100) {
 		return longTermAdvance
 	}
@@ -249,24 +253,24 @@ func isLeftGreaterThanRight(params ...float64) bool {
 	return true
 }
 
-// shortTrend has short term trend information.
-type shortTrend struct {
+// previousTrend has short term trend information.
+type previousTrend struct {
 	previousClose       float64
 	beforePreviousClose float64
 	increaseRate        float64
 	crossMovingAvg5     bool
 }
 
-func (g CalculateGrowthTrend) previousTrend(code string, m5 float64) (shortTrend, error) {
+func (g CalculateGrowthTrend) getPreviousTrend(code string, m5 float64) (previousTrend, error) {
 	closes, err := recentCloses(g.db, code, 2)
 	if err != nil {
-		return shortTrend{}, fmt.Errorf("failed to get recentCloses: %w", err)
+		return previousTrend{}, fmt.Errorf("failed to get recentCloses: %w", err)
 	}
 	p := closes[0].Close
 	b := closes[1].Close
-	return shortTrend{
-		previousClose:       p,
-		beforePreviousClose: b,
+	return previousTrend{
+		previousClose:       p, // 前営業日の終値
+		beforePreviousClose: b, // 前々営業日の終値
 		increaseRate:        p / b,
 		crossMovingAvg5:     crossedMovingAvg5(p, b, m5),
 	}, nil
