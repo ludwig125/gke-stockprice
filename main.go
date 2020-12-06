@@ -89,21 +89,6 @@ func main() {
 		}
 	}
 
-	// DEBUG onの時はしばらく動かす
-	if d := os.Getenv("DEBUG"); d == "on" {
-		for i := 0; i < 300; i++ {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			if i%10 == 0 {
-				log.Println("sleep 1 sec:", i)
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}
-
 	log.Println("process finished successfully")
 }
 

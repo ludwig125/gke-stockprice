@@ -1,5 +1,3 @@
-// +build !integration
-
 package main
 
 import (
@@ -12,13 +10,9 @@ import (
 	"testing"
 	"time"
 
-	sheets "google.golang.org/api/sheets/v4"
-
 	"github.com/ludwig125/gke-stockprice/database"
+	sheets "google.golang.org/api/sheets/v4"
 )
-
-// spreadsheet mock data
-var mockSheetData [][]string
 
 type TrendSpreadSheetMock struct {
 	Service       *sheets.Service
@@ -27,7 +21,7 @@ type TrendSpreadSheetMock struct {
 }
 
 func (s TrendSpreadSheetMock) Read() ([][]string, error) {
-	return [][]string{[]string{"a"}}, nil
+	return [][]string{}, nil
 }
 
 func (s TrendSpreadSheetMock) Insert([][]string) error {
@@ -35,7 +29,6 @@ func (s TrendSpreadSheetMock) Insert([][]string) error {
 }
 
 func (s TrendSpreadSheetMock) Update(ss [][]string) error {
-	mockSheetData = ss
 	return nil
 }
 
@@ -153,10 +146,10 @@ func TestGrowthTrend(t *testing.T) {
 		t.Fatal(err)
 	}
 	dailyData := map[string][][]string{
-		"1011": makeDailyData("1011", previousDate, 1000, CloseTestData{Num: 100}),
-		"1012": makeDailyData("1012", previousDate, 1000, CloseTestData{Num: 100, Rate: -1}),
-		"1013": makeDailyData("1013", previousDate, 1000, CloseTestData{Num: 50}, CloseTestData{Num: 50, Rate: -1}),
-		"1014": makeDailyData("1014", previousDate, 1000, CloseTestData{Num: 50, Rate: -1}, CloseTestData{Num: 50}),
+		"1011": makeDailyData("1011", previousDate, 1000, CloseTestData{Num: 100}),                                  // ずっと増加
+		"1012": makeDailyData("1012", previousDate, 1000, CloseTestData{Num: 100, Rate: -1}),                        // ずっと減少
+		"1013": makeDailyData("1013", previousDate, 1000, CloseTestData{Num: 50}, CloseTestData{Num: 50, Rate: -1}), // 前半増加、後半減少
+		"1014": makeDailyData("1014", previousDate, 1000, CloseTestData{Num: 50, Rate: -1}, CloseTestData{Num: 50}), // 前半減少、後半増加
 		"1015": makeDailyData("1015", previousDate, 1000, CloseTestData{Num: 80}, CloseTestData{Num: 10, Rate: -1}, CloseTestData{Num: 9}, CloseTestData{Num: 1, Rate: 100}),
 		"1016": makeDailyData("1016", previousDate, 1000, CloseTestData{Num: 80}, CloseTestData{Num: 10, Rate: 1}, CloseTestData{Num: 9, Rate: -1}, CloseTestData{Num: 1, Rate: -100}),
 		"1017": makeDailyData("1017", previousDate, 1000, CloseTestData{Num: 80}, CloseTestData{Num: 10}, CloseTestData{Num: 10, Rate: -1}),
@@ -216,12 +209,26 @@ func TestGrowthTrend(t *testing.T) {
 			for code := range dailyData {
 				codes = append(codes, code)
 			}
-			if err := g.growthTrend(ctx, codes); err != nil {
+
+			// if err := g.growthTrend(ctx, codes); err != nil {
+			trends, err := g.gatherAllTrends(ctx, codes)
+			if err != nil {
 				t.Error(err)
 			}
 
+			trendData := g.makeTrendDataForSheet(trends)
+			// 以下の形になるはず
+			// [code trend increaseRate crossMovingAvg5 20200305]
+			// [1015 longTermAdvance 1.093 true]
+			// [1011 longTermAdvance 1.001 false]
+			// [1014 shortTermAdvance 1.001 false]
+			// [1013 shortTermDecline 0.999 false]
+			// [1012 longTermDecline 0.9989 false]
+			// [1017 non 0.9991 false]
+			// [1016 non 0.9075 true]
+
 			var gotCodes []string
-			for i, v := range mockSheetData {
+			for i, v := range trendData {
 				t.Log(v)
 				if i == 0 {
 					continue
