@@ -82,6 +82,70 @@ $go test -v ./... -p 1 -count=1
 go testはデフォルトではパラレルでテストを実行してしまうので、
 Mysqlのデータが競合しないように`-p 1`として並列数を１にしている
 
+## ローカルのMySQLへの接続
+
+- devはパスワードがないので以下で接続できる
+
+```bash
+$ mysql -u root --host 127.0.0.1 --port 3306
+```
+
+ローカルでのテストでは`cleanup, err := database.SetupTestDB(3306)`のようにcleanup関数を返して、`defer cleanup()` でテスト用DBを消すようにしているが、
+これを以下のようにしてテストを実行すればその時のDBがそのままみられる
+```golang
+  _, err := database.SetupTestDB(3306)
+	// cleanup, err := database.SetupTestDB(3306)
+	if err != nil {
+		t.Fatalf("failed to SetupTestDB: %v", err)
+	}
+	// defer cleanup()
+```
+
+```
+$mysql -u root --host 127.0.0.1 --port 3306
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 89
+Server version: 5.7.30-0ubuntu0.18.04.1 (Ubuntu)
+
+Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| grafana_db         |
+| mysql              |
+| performance_schema |
+| stockprice_dev     |
+| sys                |
++--------------------+
+6 rows in set (0.01 sec)
+
+mysql> use stockprice_dev;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+mysql> show tables;
++--------------------------+
+| Tables_in_stockprice_dev |
++--------------------------+
+| daily                    |
+| movingavg                |
+| trend                    |
++--------------------------+
+3 rows in set (0.00 sec)
+
+mysql>
+```
+
 ## ローカル環境からcircleciジョブの実行
 
 CIRCLE_API_USER_TOKENを事前に環境変数に設定してからcurlを実行する
@@ -186,9 +250,22 @@ cloud_sql_proxy取得
 
 - <https://cloud.google.com/sql/docs/mysql/connect-admin-proxy?hl=ja>
 
+install
+
+```
+$wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+$chmod +x cloud_sql_proxy
+```
+
 cloud_sql_proxyで上のconnectionNameとportを指定
 
 - ローカルのMySQLのPort(3306)ととかぶらないように3307を使用する
+
+認証をしていなかったら事前に認証が必要
+
+```
+ $gcloud auth activate-service-account --key-file gke-stockprice-serviceaccount.json
+ ```
 
 ```bash
 $ ./cloud_sql_proxy -instances=gke-stockprice:us-central1:gke-stockprice-cloudsql-prod=tcp:3307
@@ -256,6 +333,20 @@ CREATE TABLE IF NOT EXISTS stockprice.movingavg (
 	);
 ```
 
+trend
+```bash
+CREATE TABLE IF NOT EXISTS stockprice.trend (
+        code VARCHAR(10) NOT NULL,
+        date VARCHAR(10) NOT NULL,
+        trend TINYINT(20),
+        trendTurn TINYINT(10),
+        growthRate DOUBLE,
+        crossMoving5 TINYINT(10),
+        continuationDays TINYINT(20),
+        PRIMARY KEY( code, date )
+	);
+```
+
 table確認
 ```
 mysql> use stockprice
@@ -269,8 +360,30 @@ mysql> show tables;
 +----------------------+
 | daily                |
 | movingavg            |
+| trend                |
 +----------------------+
-2 rows in set (0.13 sec)
+3 rows in set (0.13 sec)
+
+mysql>
+```
+
+table定義確認
+
+```
+mysql> desc daily;
++----------+-------------+------+-----+---------+-------+
+| Field    | Type        | Null | Key | Default | Extra |
++----------+-------------+------+-----+---------+-------+
+| code     | varchar(10) | NO   | PRI | NULL    |       |
+| date     | varchar(10) | NO   | PRI | NULL    |       |
+| open     | varchar(15) | YES  |     | NULL    |       |
+| high     | varchar(15) | YES  |     | NULL    |       |
+| low      | varchar(15) | YES  |     | NULL    |       |
+| close    | varchar(15) | YES  |     | NULL    |       |
+| turnover | varchar(15) | YES  |     | NULL    |       |
+| modified | varchar(15) | YES  |     | NULL    |       |
++----------+-------------+------+-----+---------+-------+
+8 rows in set (0.14 sec)
 
 mysql>
 ```
