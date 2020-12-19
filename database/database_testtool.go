@@ -93,8 +93,8 @@ func dropTestDB(db *sql.DB) error {
 
 // test用tableの作成
 func createTestTable(db *sql.DB) error {
-	tables := []string{
-		`stockprice_dev.daily (
+	tables := map[string]string{
+		"stockprice_dev.daily": `stockprice_dev.daily (
 		code VARCHAR(10) NOT NULL,
 		date VARCHAR(10) NOT NULL,
 		open VARCHAR(15),
@@ -105,7 +105,7 @@ func createTestTable(db *sql.DB) error {
 		modified VARCHAR(15),
 		PRIMARY KEY( code, date )
 	)`,
-		`stockprice_dev.movingavg (
+		"stockprice_dev.movingavg": `stockprice_dev.movingavg (
         code VARCHAR(10) NOT NULL,
         date VARCHAR(10) NOT NULL,
         moving3 DOUBLE,
@@ -116,9 +116,23 @@ func createTestTable(db *sql.DB) error {
         moving60 DOUBLE,
         moving100 DOUBLE,
         PRIMARY KEY( code, date )
+	)`,
+		"stockprice_dev.trend": `stockprice_dev.trend (
+		code VARCHAR(10) NOT NULL,
+		date VARCHAR(10) NOT NULL,
+		trend TINYINT(20),
+		trendTurn TINYINT(10),
+		growthRate DOUBLE,
+		crossMoving5 TINYINT(10),
+		continuationDays TINYINT(20),
+		PRIMARY KEY( code, date )
 	)`}
-	for _, ddl := range tables {
-		//log.Println("trying to create table", ddl)
+	for table, ddl := range tables {
+		log.Printf("drop TestTable: %s if exists", table)
+		if _, err := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", table)); err != nil {
+			return fmt.Errorf("failed to drop TestTable: %v", err)
+		}
+		log.Printf("create TestTable: %s if not exists", table)
 		if _, err := db.Exec("CREATE TABLE IF NOT EXISTS " + ddl); err != nil {
 			return fmt.Errorf("failed to create TestTable: %v", err)
 		}

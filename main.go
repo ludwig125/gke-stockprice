@@ -89,21 +89,6 @@ func main() {
 		}
 	}
 
-	// DEBUG onの時はしばらく動かす
-	if d := os.Getenv("DEBUG"); d == "on" {
-		for i := 0; i < 300; i++ {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			if i%10 == 0 {
-				log.Println("sleep 1 sec:", i)
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}
-
 	log.Println("process finished successfully")
 }
 
@@ -158,10 +143,11 @@ func execProcess(ctx context.Context) error {
 			calcConcurrency: strToInt(useEnvOrDefault("CALC_MOVINGAVG_CONCURRENCY", "3")), // 最大同時並行数
 		},
 		calculateGrowthTrend: CalculateGrowthTrend{
-			db:              db,
-			sheet:           trendSheet,
-			calcConcurrency: strToInt(useEnvOrDefault("CALC_GROWTHTREND_CONCURRENCY", "3")),                               // 最大同時並行数
-			targetDate:      useEnvOrDefault("GROWTHTREND_TARGETDATE", time.Now().AddDate(0, 0, -1).Format("2006/01/02")), // defaultは起動日の前日
+			db:                    db,
+			sheet:                 trendSheet,
+			calcConcurrency:       strToInt(useEnvOrDefault("CALC_GROWTHTREND_CONCURRENCY", "3")),                               // 最大同時並行数
+			targetDate:            useEnvOrDefault("GROWTHTREND_TARGETDATE", time.Now().AddDate(0, 0, -1).Format("2006/01/02")), // defaultは起動日の前日
+			longTermThresholdDays: 2,                                                                                            // TODO: どれくらいにすればいいか考える
 		},
 	}
 	if err := d.exec(ctx, codes); err != nil {
