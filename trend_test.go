@@ -51,12 +51,12 @@ func TestGrowthTrend(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		dailyData             map[string][][]string
+		dailyData             map[string][]DateClose
 		longTermThresholdDays int
 		wantCode              []string
 	}{
 		"success": {
-			dailyData: map[string][][]string{
+			dailyData: map[string][]DateClose{
 				"1011": makeDailyData("1011", targetDate, 1000, closeData{n: 100, r: 1}),                                                                           // ずっと増加
 				"1012": makeDailyData("1012", targetDate, 1000, closeData{n: 100, r: -1}),                                                                          // ずっと減少
 				"1013": makeDailyData("1013", targetDate, 1000, closeData{n: 50, r: 1}, closeData{n: 50, r: -1}),                                                   // 前半増加、後半減少
@@ -110,15 +110,16 @@ func TestGrowthTrend(t *testing.T) {
 
 			var inputsDaily, inputsMovingAvg, inputsTrend [][]string
 			// 一気にinsertするため一つにまとめる
-			for code, v := range tc.dailyData {
-				inputsDaily = append(inputsDaily, v...)
+			for code, dateCloses := range tc.dailyData {
+				inputsDaily = append(inputsDaily, convertDateClosesToStringSlice(code, dateCloses)...)
 
-				dms := makeDateMovingAvgFromDailyData(v)
+				dms := makeDateMovingAvgFromDailyData(dateCloses)
 				inputsMovingAvg = append(inputsMovingAvg, convertDateMovingAvgToStringSlice(code, dms)...)
 
-				tts := makePreviousTrendTables(code, targetDateStr, dms, tc.longTermThresholdDays)
+				tts := makePreviousTrendTables(code, targetDateStr, dms, dateCloses, tc.longTermThresholdDays)
 				inputsTrend = append(inputsTrend, convertTrendTablesToStringSlice(tts)...)
 			}
+
 			// insert daily & movingavg & trend test data to DB
 			if err := insertTestDataToDB(db, inputsDaily, inputsMovingAvg, inputsTrend); err != nil {
 				t.Fatalf("failed to insert db: %v", err)
@@ -187,7 +188,7 @@ func (c closeData) rate() int {
 }
 
 // dailyテーブル用のテストデータを作成する関数
-func makeDailyData(code string, targetDate time.Time, begin int, cs ...closeData) [][]string {
+func makeDailyData(code string, targetDate time.Time, begin int, cs ...closeData) []DateClose {
 	total := 0
 	addAndSub := 0
 	for _, c := range cs {
@@ -210,20 +211,21 @@ func makeDailyData(code string, targetDate time.Time, begin int, cs ...closeData
 	var closes []string
 	for _, c := range cs {
 		end, cs := makeCloses(begin, c)
-		// if code == "1015" || code == "1021" {
-		// 	fmt.Println("this code", code, cs)
-		// }
 		closes = append(closes, cs...)
 		begin = end
 	}
 
-	var dailyData [][]string
+	dateCloses := make([]DateClose, 0, total)
 	for i := 0; i < total; i++ {
 		date := targetDate.AddDate(0, 0, -i).Format("2006/01/02")
 		// closesの末尾から順に直近の日付の終値として詰めていく
-		dailyData = append(dailyData, []string{code, date, "1", "1", "1", closes[len(closes)-1-i], "1", "1"})
+		close, err := strconv.ParseFloat(closes[len(closes)-1-i], 64)
+		if err != nil {
+			log.Panicf("failed to convert: %v", err)
+		}
+		dateCloses = append(dateCloses, DateClose{Date: date, Close: close})
 	}
-	return dailyData
+	return dateCloses
 }
 
 // dailyテーブルの終値テストデータを作成する関数
@@ -239,12 +241,16 @@ func makeCloses(begin int, c closeData) (int, []string) {
 	return end, s
 }
 
-func makeDateMovingAvgFromDailyData(daily [][]string) []DateMovingAvgs {
-	var dcs DateCloses
-	for _, d := range daily {
-		f, _ := strconv.ParseFloat(d[5], 64)
-		dcs = append(dcs, DateClose{Date: d[1], Close: f})
+func convertDateClosesToStringSlice(code string, dateCloses []DateClose) [][]string {
+	var ss [][]string
+	for _, dateClose := range dateCloses {
+		ss = append(ss, []string{code, dateClose.Date, "1", "1", "1", fmt.Sprintf("%0.f", dateClose.Close), "1", "1"}) // 小数点以下削除する
 	}
+	return ss
+}
+
+func makeDateMovingAvgFromDailyData(dateCloses []DateClose) []DateMovingAvgs {
+	dcs := DateCloses(dateCloses)
 
 	moving := make(map[int]map[string]float64)
 	for _, days := range targetMovingAvgs {
@@ -288,7 +294,7 @@ func convertDateMovingAvgToStringSlice(code string, dms []DateMovingAvgs) [][]st
 // growthTrend関数は、targetDateまでの過去データがdailyとmovingavg tableに格納されている前提で、
 // targetDateのtrendTableを作成するので、trend tableにはtargetDate前日分までが格納される必要があることに注意
 // (trend table はdailyなどと比べてtargetDate当日分のデータが入らない状態でgrowthTrend関数が動き, targetDateのTrendはその時点で格納される)
-func makePreviousTrendTables(code string, targetDate string, dms []DateMovingAvgs, longTermThresholdDays int) []TrendTable {
+func makePreviousTrendTables(code string, targetDate string, dms []DateMovingAvgs, dateCloses []DateClose, longTermThresholdDays int) []TrendTable {
 	var trendTables []TrendTable
 	pastTrends := []Trend{}
 
@@ -308,13 +314,30 @@ func makePreviousTrendTables(code string, targetDate string, dms []DateMovingAvg
 			M100: ms.M100,
 		}
 
+		closes := makeClosesForTrendTable(date, dateCloses)
+
 		reversedPastTrends := makeReversePastTrends(pastTrends, longTermThresholdDays)
-		latestTrendTable := makeTrendTable(code, date, tm, reversedPastTrends, nil, longTermThresholdDays)
+		latestTrendTable := makeTrendTable(code, date, tm, reversedPastTrends, closes, longTermThresholdDays)
 		trendTables = append(trendTables, latestTrendTable)
 
 		pastTrends = append(pastTrends, latestTrendTable.trend)
 	}
 	return trendTables
+}
+
+func makeClosesForTrendTable(date string, dateCloses []DateClose) []float64 {
+	var closes []float64
+	for _, dateClose := range dateCloses {
+		if date < dateClose.Date {
+			continue
+		}
+		// fmt.Println("hgeeeeeee", date, dateClose.Date, dateClose.Close)
+		closes = append(closes, dateClose.Close)
+		if len(closes) == 12 { // 直近の12件とったらおしまい(continuationDaysを最大１１まで取るため)
+			break
+		}
+	}
+	return closes
 }
 
 // このpastTrendsは日付の古い順に入っているので、逆順のSliceを作る
@@ -445,7 +468,11 @@ func TestCalcContinuationDays(t *testing.T) {
 		},
 		"up-11": {
 			closes: []float64{100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89},
-			want:   10, // 10より上はない
+			want:   11,
+		},
+		"up-12": {
+			closes: []float64{100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89, 88},
+			want:   11, // 11より上はない
 		},
 		"down-1": {
 			closes: []float64{100, 101},
@@ -505,7 +532,11 @@ func TestCalcContinuationDays(t *testing.T) {
 		},
 		"down-11": {
 			closes: []float64{100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111},
-			want:   10, // 10より上はない
+			want:   11,
+		},
+		"down-12": {
+			closes: []float64{100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112},
+			want:   11,
 		},
 	}
 	for name, tc := range tests {
