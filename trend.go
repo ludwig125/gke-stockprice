@@ -181,8 +181,8 @@ func (g CalculateGrowthTrend) fetchTrendData(code string) (TrendMovingAvgs, []Tr
 		return TrendMovingAvgs{}, nil, nil, fmt.Errorf("failed to getPastTrends: %w", err)
 	}
 
-	// 直近11日分のclosesを取得
-	closes, err := g.getRecentCloses(code, 11) // daily table を参照する
+	// 直近12日分のclosesを取得
+	closes, err := g.getRecentCloses(code, 12) // daily table を参照する
 	if err != nil {
 		return TrendMovingAvgs{}, nil, nil, fmt.Errorf("failed to getRecentCloses: %w", err)
 	}
@@ -196,7 +196,7 @@ func makeTrendTable(code, targetDate string, movings TrendMovingAvgs, pastTrends
 		code:             code,
 		date:             targetDate,
 		trend:            trend,
-		trendTurn:        trendTurnType(trend, pastTrends, false),
+		trendTurn:        trendTurnType(trend, pastTrends),
 		growthRate:       latestGrowthRate(closes),
 		crossMoving5:     crossMovingAvg5Type(closes, movings.M5),
 		continuationDays: calcContinuationDays(closes),
@@ -391,34 +391,19 @@ func (t TrendTurnType) String() string {
 	return [4]string{"unknownTurn", "downwardTurn", "noTurn", "upwardTurn"}[t]
 }
 
-func trendTurnType(trend Trend, pastTrends []Trend, flg bool) TrendTurnType {
+func trendTurnType(trend Trend, pastTrends []Trend) TrendTurnType {
 	if len(pastTrends) == 0 { // pastTrendsがサイズ０の時は無視
-		if flg {
-			fmt.Println("0 unknownTurn", trend, pastTrends)
-		}
 		return unknownTurn
 	}
 	prevTrend := pastTrends[0]
 	if prevTrend == 0 { // prevTrendがunknownの時は無視
-		if flg {
-			fmt.Println("unknownTurn", trend, prevTrend)
-		}
 		return unknownTurn
 	}
 	if trend > prevTrend {
-		if flg {
-			fmt.Println("upwardTurn", trend, prevTrend)
-		}
 		return upwardTurn
 	}
 	if trend < prevTrend {
-		if flg {
-			fmt.Println("downwardTurn", trend, prevTrend)
-		}
 		return downwardTurn
-	}
-	if flg {
-		fmt.Println("last noturn", trend, pastTrends)
 	}
 	return noTurn
 }
@@ -495,7 +480,7 @@ func calcContinuationDays(closes []float64) int {
 	}
 	continuationDays = 1
 
-	for i := 1; i < 10; i++ {
+	for i := 1; i < 11; i++ {
 		evaluateRange := i + 2 // 評価対象のclose数。3から順に大きくして連続何日続いているか調べる
 		if len(closes) < evaluateRange {
 			return continuationDays
@@ -513,7 +498,7 @@ func calcContinuationDays(closes []float64) int {
 		continuationDays++
 	}
 
-	// continuationDays	は最大10でおしまい
+	// continuationDays	は最大11でおしまい
 	return continuationDays
 }
 
