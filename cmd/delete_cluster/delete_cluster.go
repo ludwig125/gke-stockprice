@@ -40,9 +40,9 @@ func main() {
 		return
 	}
 
-	// kubectl logs
-	if err := kubectlLogs(ctx, dSrv, cluster); err != nil {
-		log.Println("failed to kubectlLogs:", err)
+	// kubectl result upload
+	if err := kubectlResultUpload(ctx, dSrv, cluster); err != nil {
+		log.Println("failed to kubectlResultUpload:", err)
 	}
 	// cluster削除
 	if err := deleteCluster(cluster); err != nil {
@@ -61,7 +61,7 @@ func main() {
 	log.Println("GKE cluster already deleted")
 }
 
-func kubectlLogs(ctx context.Context, dSrv *drive.Service, cluster *gke.Cluster) error {
+func kubectlResultUpload(ctx context.Context, dSrv *drive.Service, cluster *gke.Cluster) error {
 	// kubectl logsの前にクラスタの認証が必要
 	if err := cluster.GetCredentials(); err != nil {
 		return fmt.Errorf("failed to GetCredentials: %v", err)
@@ -70,11 +70,51 @@ func kubectlLogs(ctx context.Context, dSrv *drive.Service, cluster *gke.Cluster)
 
 	folderName := mustGetenv("DRIVE_FOLDER_NAME")
 	permissionTargetGmail := mustGetenv("DRIVE_PERMISSION_GMAIL")
+
 	fileName := "kubectl_logs"
-	dumpTime := time.Now()
+	cmd := "kubectl logs $(kubectl get pods | grep stockprice | awk '{print $1}') -c gke-stockprice-container"
 	// kubectl logsの結果をupload
-	if err := uploadKubectlLog(ctx, dSrv, folderName, permissionTargetGmail, fileName, dumpTime); err != nil {
-		return fmt.Errorf("failed to uploadKubectlLog: %v", err)
+	if err := uploadToGoogleDrive(ctx, dSrv, folderName, permissionTargetGmail, fileName, cmd, time.Now()); err != nil {
+		return fmt.Errorf("failed to uploadToGoogleDrive: %v", err)
+	}
+
+	fileName = "kubectl_top"
+	cmd = "kubectl top nodes"
+	// kubectl topの結果をupload
+	if err := uploadToGoogleDrive(ctx, dSrv, folderName, permissionTargetGmail, fileName, cmd, time.Now()); err != nil {
+		return fmt.Errorf("failed to uploadToGoogleDrive: %v", err)
+	}
+
+	fileName = "kubectl_describe"
+	cmd = "kubectl describe nodes"
+	// kubectl describeの結果をupload
+	if err := uploadToGoogleDrive(ctx, dSrv, folderName, permissionTargetGmail, fileName, cmd, time.Now()); err != nil {
+		return fmt.Errorf("failed to uploadToGoogleDrive: %v", err)
+	}
+	return nil
+}
+
+func uploadToGoogleDrive(ctx context.Context, srv *drive.Service, folderName, permissionTargetGmail, fileName, cmd string, dumpTime time.Time) error {
+	// フォルダIDの取得（フォルダがなければ作る）
+	folderID, err := googledrive.GetFolderIDOrCreate(srv, folderName, permissionTargetGmail) // permission共有Gmailを空にするとユーザにはUIから見ることはできないことに注意
+	if err != nil {
+		return fmt.Errorf("failed to GetFolderIDOrCreate: %v, folderName(parent folder): %s", err, folderName)
+	}
+
+	fi := googledrive.FileInfo{
+		Name:        fileName,
+		Description: fmt.Sprintf("%s dumpdate: %s", fileName, dumpTime.Format("2006-01-02")),
+		MimeType:    "text/plain",
+		ParentID:    folderID,
+		Overwrite:   true,
+	}
+
+	c, err := googledrive.NewCommandResultUpload(srv, cmd, fi)
+	if err != nil {
+		return fmt.Errorf("failed to NewCommandResultUpload: %v", err)
+	}
+	if err := c.Exec(ctx); err != nil {
+		return fmt.Errorf("failed to Exec: %v", err)
 	}
 	return nil
 }
@@ -90,32 +130,6 @@ func deleteCluster(cluster *gke.Cluster) error {
 
 	}
 	log.Printf("delete GKE cluster %v successfully. time: %v", cluster.ClusterName, time.Since(start))
-	return nil
-}
-
-func uploadKubectlLog(ctx context.Context, srv *drive.Service, folderName, permissionTargetGmail, fileName string, dumpTime time.Time) error {
-	// フォルダIDの取得（フォルダがなければ作る）
-	folderID, err := googledrive.GetFolderIDOrCreate(srv, folderName, permissionTargetGmail) // permission共有Gmailを空にするとユーザにはUIから見ることはできないことに注意
-	if err != nil {
-		return fmt.Errorf("failed to GetFolderIDOrCreate: %v, folderName(parent folder): %s", err, folderName)
-	}
-
-	fi := googledrive.FileInfo{
-		Name:        fileName,
-		Description: fmt.Sprintf("%s dumpdate: %s", fileName, dumpTime.Format("2006-01-02")),
-		MimeType:    "text/plain",
-		ParentID:    folderID,
-		Overwrite:   true,
-	}
-
-	cmd := "kubectl logs $(kubectl get pods | grep stockprice | awk '{print $1}') -c gke-stockprice-container"
-	c, err := googledrive.NewCommandResultUpload(srv, cmd, fi)
-	if err != nil {
-		return fmt.Errorf("failed to NewCommandResultUpload: %v", err)
-	}
-	if err := c.Exec(ctx); err != nil {
-		return fmt.Errorf("failed to Exec: %v", err)
-	}
 	return nil
 }
 
