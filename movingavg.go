@@ -13,40 +13,49 @@ import (
 
 var (
 	// 移動平均の計算対象の期間
-	targetPeriod = 200
+	targetPeriod = 100
 	// 取得対象の移動平均
 	targetMovingAvgs = []int{3, 5, 7, 10, 20, 60, 100}
 )
 
-// CodeDateMovingAvgs has code and multiple DateMovingAvgs.
-type CodeDateMovingAvgs struct {
-	code           string
-	dateMovingAvgs []DateMovingAvgs
-}
+// // CodeDateMovingAvgs has code and multiple DateMovingAvgs.
+// type CodeDateMovingAvgs struct {
+// 	code           string
+// 	dateMovingAvgs []DateMovingAvgs
+// }
+
+// CodeDateMovingAvgs maps code and multiple DateMovingAvgs.
+type CodeDateMovingAvgs map[string][]DateMovingAvgs
 
 // Slices converts CodeDateMovingAvgs to double string slice.
 func (c CodeDateMovingAvgs) Slices() [][]string {
+	// 移動平均のDBに入れるためのスライス
+	var movingavgData [][]string
+	for code, dateMovingAvgs := range c {
+		for _, dateMovingAvg := range dateMovingAvgs {
+			movingavgData = append(movingavgData, codeDateMovingavgsToStringSlice(code, dateMovingAvg))
+		}
+	}
+	return movingavgData
+}
+
+func codeDateMovingavgsToStringSlice(code string, dateMovingAvgs DateMovingAvgs) []string {
 	trim := func(f float64) string {
 		// 小数点以下の0しかない部分は入れないために%gを使う
 		return fmt.Sprintf("%g", f)
 	}
-
-	// 移動平均のDBに入れるためのスライス
-	var ss [][]string
-	for _, d := range c.dateMovingAvgs {
-		s := []string{
-			c.code,
-			d.date,
-			trim(d.movingAvgs.M3),
-			trim(d.movingAvgs.M5),
-			trim(d.movingAvgs.M7),
-			trim(d.movingAvgs.M10),
-			trim(d.movingAvgs.M20),
-			trim(d.movingAvgs.M60),
-			trim(d.movingAvgs.M100)}
-		ss = append(ss, s)
+	m := dateMovingAvgs.movingAvgs
+	return []string{
+		code,
+		dateMovingAvgs.date,
+		trim(m.M3),
+		trim(m.M5),
+		trim(m.M7),
+		trim(m.M10),
+		trim(m.M20),
+		trim(m.M60),
+		trim(m.M100),
 	}
-	return ss
 }
 
 // CalculateMovingAvg is configuration to calculate moving average.
@@ -76,7 +85,9 @@ func (m CalculateMovingAvg) saveMovingAvgs(ctx context.Context, codes []string) 
 			if err != nil {
 				return fmt.Errorf("failed to calculateEachMovingAvg: %v", err)
 			}
-			cdm := CodeDateMovingAvgs{code: code, dateMovingAvgs: dm}
+
+			cdm := CodeDateMovingAvgs{code: dm}
+			// cdm := CodeDateMovingAvgs{code: code, dateMovingAvgs: dm}
 			if err := m.db.InsertDB("movingavg", cdm.Slices()); err != nil {
 				return fmt.Errorf("failed to insert movingavg: %v", err)
 			}
@@ -88,7 +99,7 @@ func (m CalculateMovingAvg) saveMovingAvgs(ctx context.Context, codes []string) 
 }
 
 func (m CalculateMovingAvg) movingAvgs(code string) ([]DateMovingAvgs, error) {
-	// 直近200日分の終値を取得する
+	// 直近100日分の終値を取得する
 	rc, err := m.recentCloses(code)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get recentCloses: %v", err)

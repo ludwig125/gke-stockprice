@@ -56,20 +56,65 @@ func TestInsertSelectDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to NewTestDB: %v", err)
 	}
+
 	inputs := [][]string{
-		{"1001", "2019/05/16", "4826", "4866", "4790", "4800", "5440600", "4800.0"},
-		{"1001", "2019/05/15", "4841", "4854", "4781", "4854", "5077200", "4854.0"},
-		{"1001", "2019/05/14", "4780", "4873", "4775", "4870", "7363600", "4870.0"},
+		{"1001", "2019/05/16", "100", "110", "120", "130", "140000", "150.0"},
+		{"1001", "2019/05/15", "101", "111", "121", "131", "140001", "151.0"},
+		{"1001", "2019/05/14", "102", "112", "122", "132", "140002", "152.0"},
 	}
-	if err := db.InsertDB("daily", inputs); err != nil {
-		t.Error(err)
+	// 以下のテストデータは上のinputsの100を1100にしたもの
+	inputs2 := [][]string{
+		{"1001", "2019/05/16", "1100", "110", "120", "130", "140000", "150.0"},
+		{"1001", "2019/05/15", "1101", "111", "121", "131", "140001", "151.0"},
+		{"1001", "2019/05/14", "1102", "112", "122", "132", "140002", "152.0"},
 	}
+	t.Run("insert", func(t *testing.T) {
+		if err := db.InsertDB("daily", inputs); err != nil {
+			t.Error(err)
+		}
+		ret, err := db.SelectDB("SELECT * FROM daily")
+		if err != nil {
+			t.Error(err)
+		}
+		// insert対象のデータとinsert後のテーブルからのselectの結果を比較
+		if !compare2dSlices(ret, inputs) {
+			t.Errorf("got %#v, want %#v", ret, inputs)
+		}
+	})
 
-	ret, err := db.SelectDB("SELECT * FROM daily")
-	if err != nil {
-		t.Error(err)
-	}
+	t.Run("insert_duplicate_key_ignore", func(t *testing.T) {
+		// InsertDBでinputs2を入れてみる
+		if err := db.InsertDB("daily", inputs2); err != nil {
+			t.Error(err)
+		}
+		ret, err := db.SelectDB("SELECT * FROM daily")
+		if err != nil {
+			t.Error(err)
+		}
+		// InsertDBの場合は INSERT IGNORE なので、すでにあるレコードはスキップされて最初のinputsと変化なし
+		if !compare2dSlices(ret, inputs) {
+			t.Errorf("got %#v, want %#v", ret, inputs)
+		}
+	})
 
+	t.Run("insert_duplicate_key_update", func(t *testing.T) {
+		// InsertOrUpdateDBでinputsを入れなおす
+		if err := db.InsertOrUpdateDB("daily", inputs2); err != nil {
+			t.Error(err)
+		}
+		ret, err := db.SelectDB("SELECT * FROM daily")
+		if err != nil {
+			t.Error(err)
+		}
+		// InsertOrUpdateDBの場合は INSERT ON DUPLICATE KEY UPDATE なので、すでにあるレコードもアップデートされる
+		// なので、SElECT結果はinputs2になる
+		if !compare2dSlices(ret, inputs2) {
+			t.Errorf("got %#v, want %#v", ret, inputs2)
+		}
+	})
+}
+
+func compare2dSlices(ret, inputs [][]string) bool {
 	// DeepEqualはsliceの順序までみて一致を判定するのでSliceをMapに変換する
 	sliceToMap := func(s [][]string) map[string]bool {
 		m := make(map[string]bool)
@@ -79,8 +124,5 @@ func TestInsertSelectDB(t *testing.T) {
 		}
 		return m
 	}
-	// insert対象のデータとinsert後のテーブルからのselectの結果を比較
-	if !reflect.DeepEqual(sliceToMap(ret), sliceToMap(inputs)) {
-		t.Errorf("got %#v, want %#v", ret, inputs)
-	}
+	return reflect.DeepEqual(sliceToMap(ret), sliceToMap(inputs))
 }

@@ -70,6 +70,9 @@ func TestGrowthTrend(t *testing.T) {
 				"1021": makeDailyData("1021", targetDate, 1000, closeData{n: 99}, closeData{n: 1, r: -2}),                                                          // ずっと横這い最後の1日だけ減少
 				"1022": makeDailyData("1022", targetDate, 1000, closeData{n: 97, r: 1}, closeData{n: 3, r: -10}),                                                   // 最後だけ急落
 				"1023": makeDailyData("1023", targetDate, 1000, closeData{n: 97, r: -1}, closeData{n: 3, r: 10}),                                                   // 最後だけ急騰
+				// "1111": makeDailyData("1111", targetDate, 100000, closeData{n: 10000, r: 1}),                                                                       // ずっと増加
+				// "1111": makeDailyData("1111", targetDate, 100000, closeData{n: 9998, r: 1}, closeData{n: 2, r: 21}), // ずっと増加
+				// "1112": makeDailyData("1112", targetDate, 100000, closeData{n: 10000, r: -1}), // ずっと減少
 			},
 			longTermThresholdDays: 2,
 			wantCode:              []string{"1015", "1011", "1020", "1014", "1023", "1019", "1017", "1018", "1022", "1013", "1021", "1012", "1016"},
@@ -113,7 +116,7 @@ func TestGrowthTrend(t *testing.T) {
 			for code, dateCloses := range tc.dailyData {
 				inputsDaily = append(inputsDaily, convertDateClosesToStringSlice(code, dateCloses)...)
 
-				dms := makeDateMovingAvgFromDailyData(dateCloses)
+				dms := calculateMovingAvg(dateCloses)
 				inputsMovingAvg = append(inputsMovingAvg, convertDateMovingAvgToStringSlice(code, dms)...)
 
 				tts := makePreviousTrendTables(code, targetDateStr, dms, dateCloses, tc.longTermThresholdDays)
@@ -249,34 +252,6 @@ func convertDateClosesToStringSlice(code string, dateCloses []DateClose) [][]str
 	return ss
 }
 
-func makeDateMovingAvgFromDailyData(dateCloses []DateClose) []DateMovingAvgs {
-	dcs := DateCloses(dateCloses)
-
-	moving := make(map[int]map[string]float64)
-	for _, days := range targetMovingAvgs {
-		moving[days] = dcs.calcMovingAvg(days)
-	}
-
-	var dateMovingAvgs []DateMovingAvgs
-	for _, r := range dcs {
-		d := r.Date // 日付
-		dm := DateMovingAvgs{
-			date: d,
-			movingAvgs: MovingAvgs{
-				M3:   moving[3][d],
-				M5:   moving[5][d],
-				M7:   moving[7][d],
-				M10:  moving[10][d],
-				M20:  moving[20][d],
-				M60:  moving[60][d],
-				M100: moving[100][d],
-			},
-		}
-		dateMovingAvgs = append(dateMovingAvgs, dm)
-	}
-	return dateMovingAvgs
-}
-
 func convertDateMovingAvgToStringSlice(code string, dms []DateMovingAvgs) [][]string {
 	str := func(f float64) string {
 		return fmt.Sprintf("%g", f)
@@ -302,7 +277,7 @@ func makePreviousTrendTables(code string, targetDate string, dms []DateMovingAvg
 		dm := dms[i]
 		date := dm.date
 
-		if date == targetDate {
+		if date == targetDate { // testではtargetDateを設定するので、ここではそれ以前のデータまで作る。従ってtargetDate分は無視する
 			continue
 		}
 
@@ -314,7 +289,7 @@ func makePreviousTrendTables(code string, targetDate string, dms []DateMovingAvg
 			M100: ms.M100,
 		}
 
-		closes := makeClosesForTrendTable(date, dateCloses)
+		closes := extractCloses(date, dateCloses)
 
 		reversedPastTrends := makeReversePastTrends(pastTrends, longTermThresholdDays)
 		latestTrendTable := makeTrendTable(code, date, tm, reversedPastTrends, closes, longTermThresholdDays)
@@ -323,34 +298,6 @@ func makePreviousTrendTables(code string, targetDate string, dms []DateMovingAvg
 		pastTrends = append(pastTrends, latestTrendTable.trend)
 	}
 	return trendTables
-}
-
-func makeClosesForTrendTable(date string, dateCloses []DateClose) []float64 {
-	var closes []float64
-	for _, dateClose := range dateCloses {
-		if date < dateClose.Date {
-			continue
-		}
-		// fmt.Println("hgeeeeeee", date, dateClose.Date, dateClose.Close)
-		closes = append(closes, dateClose.Close)
-		if len(closes) == 12 { // 直近の12件とったらおしまい(continuationDaysを最大１１まで取るため)
-			break
-		}
-	}
-	return closes
-}
-
-// このpastTrendsは日付の古い順に入っているので、逆順のSliceを作る
-// longTermThresholdDaysに達したら打ち切る
-func makeReversePastTrends(pastTrends []Trend, longTermThresholdDays int) []Trend {
-	tmpTrends := make([]Trend, 0, len(pastTrends))
-	for j := len(pastTrends) - 1; j >= 0; j-- {
-		tmpTrends = append(tmpTrends, pastTrends[j])
-		if len(tmpTrends) >= longTermThresholdDays {
-			return tmpTrends
-		}
-	}
-	return tmpTrends
 }
 
 func convertTrendTablesToStringSlice(tts []TrendTable) [][]string {
@@ -472,7 +419,7 @@ func TestCalcContinuationDays(t *testing.T) {
 		},
 		"up-12": {
 			closes: []float64{100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89, 88},
-			want:   11, // 11より上はない
+			want:   11, // 11より上はない maxContinuationDays=11なので
 		},
 		"down-1": {
 			closes: []float64{100, 101},
