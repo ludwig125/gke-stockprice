@@ -482,6 +482,15 @@ gcloud --quiet container clusters create $CLUSTER_NAME \
 ```
 - `-quiet`をつけることで作成時の「yes/no」の入力を省略できる
 
+## クラスタの確認
+
+```
+$gcloud container clusters list
+NAME                         LOCATION       MASTER_VERSION    MASTER_IP    MACHINE_TYPE  NODE_VERSION      NUM_NODES  STATUS
+gke-stockprice-cluster-prod  us-central1-f  1.16.15-gke.4901  34.69.70.18  g1-small      1.16.15-gke.4901  3          RUNNING
+```
+
+
 ## kubectlインストール
 
 ```

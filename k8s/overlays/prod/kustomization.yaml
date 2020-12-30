@@ -30,6 +30,14 @@ configMapGenerator:
   - DB_PORT=3306
   - DB_NAME=stockprice
   - DUMP_TARGET_TABLES=daily,movingavg
+  - RESTRUCTURE_EXECUTE_DATE=2021/01/01
+  - RESTRUCTURE_FROM_DAILY_TABLE=daily
+  - RESTRUCTURE_TO_MOVINGAVG_TABLE=movingavg_test
+  - RESTRUCTURE_TO_TREND_TABLE=trend_test
+  - RESTRUCTURE_FROM_DATE=2020/10/01
+  - RESTRUCTURE_TO_DATE=2020/12/29
+  - RESTRUCTURE_MAX_CONCURRENCY=20
+
   files:
   # echo -n "value" > fileの形で事前に配置しておく
   # echo -nする理由は、環境変数の末尾に改行コードが含まれないようにするため

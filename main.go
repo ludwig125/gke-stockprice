@@ -20,6 +20,7 @@ import (
 	"github.com/ludwig125/gke-stockprice/googledrive"
 	"github.com/ludwig125/gke-stockprice/retry"
 	"github.com/ludwig125/gke-stockprice/sheet"
+	"github.com/ludwig125/gke-stockprice/status"
 )
 
 var (
@@ -129,6 +130,11 @@ func execProcess(ctx context.Context) error {
 
 	// daily処理の進捗を管理するためのSheet
 	statusSheet := sheet.NewSpreadSheet(srv, mustGetenv("STATUS_SHEETID"), "status")
+
+	if err := restructureTablesFromDaily(db, codes, statusSheet); err != nil {
+		return fmt.Errorf("failed to restructureTablesFromDaily: %v", err)
+	}
+
 	d := daily{
 		status: statusSheet,
 		dayoff: dayoff,
@@ -286,6 +292,45 @@ func fetchCompanyCode(s sheet.Sheet) ([]string, error) {
 		codes = append(codes, c)
 	}
 	return codes, nil
+}
+
+func restructureTablesFromDaily(db database.DB, codes []string, statusSheet sheet.Sheet) error {
+	st := status.Status{Sheet: statusSheet} // Status管理用の変数
+	start := now()
+	defer st.InsertStatus("restructureTablesFromDaily", now(), now().Sub(start)) // now().Sub(start)で所要時間も入れておく
+
+	executeDate := os.Getenv("RESTRUCTURE_EXECUTE_DATE")
+	if executeDate == "" {
+		log.Printf("RESTRUCTURE_EXECUTE_DATE is not set. no need to restructure")
+		return nil
+	}
+	today := time.Now().Format("2006/01/02")
+	if executeDate == today {
+		log.Printf("RESTRUCTURE_EXECUTE_DATE(%s) is not today(%s). no need to restructure", executeDate, today)
+		return nil
+	}
+
+	restructureConfig := RestructureTablesFromDailyConfig{
+		DB:                   db,
+		DailyTable:           useEnvOrDefault("RESTRUCTURE_FROM_DAILY_TABLE", "daily"),
+		MovingAvgTable:       mustGetenv("RESTRUCTURE_TO_MOVINGAVG_TABLE"),
+		TrendTable:           mustGetenv("RESTRUCTURE_TO_TREND_TABLE"),
+		Codes:                codes,
+		RestructureMovingavg: true,
+		RestructureTrend:     true,
+		FromDate:             useEnvOrDefault("RESTRUCTURE_FROM_DATE", time.Now().AddDate(0, 0, -10).Format("2006/01/02")),
+		ToDate:               useEnvOrDefault("RESTRUCTURE_TO_DATE", time.Now().Format("2006/01/02")),
+		MaxConcurrency:       strToInt(useEnvOrDefault("RESTRUCTURE_MAX_CONCURRENCY", "10")),
+		// TODO: LongTermThresholdDaysも環境変数から指定する
+	}
+	restructure, err := NewRestructureTablesFromDaily(restructureConfig)
+	if err != nil {
+		return fmt.Errorf("failed to NewRestructureTablesFromDaily: %w", err)
+	}
+	if err := restructure.Restructure(); err != nil {
+		return fmt.Errorf("failed to Restructure: %w", err)
+	}
+	return nil
 }
 
 func backupMySQL(ctx context.Context, driveSrv *drive.Service) error {

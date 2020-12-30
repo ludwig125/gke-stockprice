@@ -14,6 +14,8 @@ import (
 	"github.com/ludwig125/gke-stockprice/sheet"
 )
 
+var maxContinuationDays = 11
+
 // CalculateGrowthTrend is configuration to calculate growth trend.
 type CalculateGrowthTrend struct {
 	db                    database.DB
@@ -170,6 +172,88 @@ func (g CalculateGrowthTrend) getTrendTable(code string) (TrendTable, error) {
 	return makeTrendTable(code, g.targetDate, movings, pastTrends, closes, g.longTermThresholdDays), nil
 }
 
+// func (g CalculateGrowthTrend) fetchTrendData(code string) (TrendMovingAvgs, []Trend, []float64, error) {
+// 	movings, err := g.getMovingAvgs(code, g.targetDate) // movingavg table を参照する
+// 	if err != nil {
+// 		return TrendMovingAvgs{}, nil, nil, fmt.Errorf("failed to getMovingAvgs: %w", err)
+// 	}
+
+// 	pastTrends, err := g.getPastTrends(code) // trend tableを参照する
+// 	if err != nil {
+// 		return TrendMovingAvgs{}, nil, nil, fmt.Errorf("failed to getPastTrends: %w", err)
+// 	}
+
+// 	// 直近12日分のclosesを取得
+// 	closes, err := g.getRecentCloses(code, 12) // daily table を参照する
+// 	if err != nil {
+// 		return TrendMovingAvgs{}, nil, nil, fmt.Errorf("failed to getRecentCloses: %w", err)
+// 	}
+
+// 	return movings, pastTrends, closes, nil
+// }
+
+func makeTrendTable(code, targetDate string, movings TrendMovingAvgs, pastTrends []Trend, closes []float64, longTermThresholdDays int) TrendTable {
+	trend := classifyTrend(movings, pastTrends, longTermThresholdDays)
+	return TrendTable{
+		code:             code,
+		date:             targetDate,
+		trend:            trend,
+		trendTurn:        trendTurnType(trend, pastTrends),
+		growthRate:       latestGrowthRate(closes),
+		crossMoving5:     crossMovingAvg5Type(closes, movings.M5),
+		continuationDays: calcContinuationDays(closes),
+	}
+}
+
+// CodeDateTrendLists maps code and DateTrendList.
+type CodeDateTrendLists map[string][]DateTrendList
+
+func (c CodeDateTrendLists) makeTrendDataForDB() [][]string {
+	var trendData [][]string
+	for code, dateTrendLists := range c {
+		for _, dateTrendList := range dateTrendLists {
+			trendData = append(trendData, codeDateTrendListToStringSlice(code, dateTrendList))
+		}
+	}
+	return trendData
+}
+
+func codeDateTrendListToStringSlice(code string, dateTrendList DateTrendList) []string {
+	trendList := dateTrendList.trendList
+	return []string{
+		code,
+		dateTrendList.date,
+		fmt.Sprintf("%d", trendList.trend),
+		fmt.Sprintf("%d", trendList.trendTurn),
+		fmt.Sprintf("%.4g", trendList.growthRate),
+		fmt.Sprintf("%d", trendList.crossMoving5),
+		fmt.Sprintf("%d", trendList.continuationDays),
+	}
+}
+
+// DateTrendList has date and []TrendList.
+type DateTrendList struct {
+	date      string
+	trendList TrendList
+}
+
+// TrendList has several trend information.
+type TrendList struct {
+	trend            Trend
+	trendTurn        TrendTurnType
+	growthRate       float64
+	crossMoving5     CrossMoving5Type
+	continuationDays int
+}
+
+func (g CalculateGrowthTrend) makeTrendList(code string) (TrendList, error) {
+	movings, pastTrends, closes, err := g.fetchTrendData(code)
+	if err != nil {
+		return TrendList{}, fmt.Errorf("failed to fetchTrendData: %w", err)
+	}
+	return calculateTrendList(movings, pastTrends, closes, g.longTermThresholdDays), nil
+}
+
 func (g CalculateGrowthTrend) fetchTrendData(code string) (TrendMovingAvgs, []Trend, []float64, error) {
 	movings, err := g.getMovingAvgs(code, g.targetDate) // movingavg table を参照する
 	if err != nil {
@@ -181,8 +265,8 @@ func (g CalculateGrowthTrend) fetchTrendData(code string) (TrendMovingAvgs, []Tr
 		return TrendMovingAvgs{}, nil, nil, fmt.Errorf("failed to getPastTrends: %w", err)
 	}
 
-	// 直近12日分のclosesを取得
-	closes, err := g.getRecentCloses(code, 12) // daily table を参照する
+	// 直近maxContinuationDays+1日分のclosesを取得
+	closes, err := g.getRecentCloses(code, maxContinuationDays+1) // daily table を参照する
 	if err != nil {
 		return TrendMovingAvgs{}, nil, nil, fmt.Errorf("failed to getRecentCloses: %w", err)
 	}
@@ -190,11 +274,9 @@ func (g CalculateGrowthTrend) fetchTrendData(code string) (TrendMovingAvgs, []Tr
 	return movings, pastTrends, closes, nil
 }
 
-func makeTrendTable(code, targetDate string, movings TrendMovingAvgs, pastTrends []Trend, closes []float64, longTermThresholdDays int) TrendTable {
+func calculateTrendList(movings TrendMovingAvgs, pastTrends []Trend, closes []float64, longTermThresholdDays int) TrendList {
 	trend := classifyTrend(movings, pastTrends, longTermThresholdDays)
-	return TrendTable{
-		code:             code,
-		date:             targetDate,
+	return TrendList{
 		trend:            trend,
 		trendTurn:        trendTurnType(trend, pastTrends),
 		growthRate:       latestGrowthRate(closes),
@@ -480,7 +562,7 @@ func calcContinuationDays(closes []float64) int {
 	}
 	continuationDays = 1
 
-	for i := 1; i < 11; i++ {
+	for i := 1; i < maxContinuationDays; i++ {
 		evaluateRange := i + 2 // 評価対象のclose数。3から順に大きくして連続何日続いているか調べる
 		if len(closes) < evaluateRange {
 			return continuationDays

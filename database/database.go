@@ -17,7 +17,9 @@ import (
 type DB interface {
 	ShowDatabases() (string, error)
 	InsertDB(table string, records [][]string) error
+	InsertOrUpdateDB(table string, records [][]string) error
 	SelectDB(q string) ([][]string, error)
+	DeleteFromDB(table string, codes []string) error
 	CloseDB() error
 }
 
@@ -115,6 +117,7 @@ func (m *MySQL) InsertDB(table string, records [][]string) error {
 
 	// insertのprebare作成
 	var buf bytes.Buffer
+	// データがなかったらINSERTして欲しいけど既に入っている場合には何もして欲しくない
 	fmt.Fprintf(&buf, "INSERT IGNORE INTO %s VALUES (", table)
 	columns := len(records[0]) // 項目数だけ?をつなげる
 	for i := 0; i < columns-1; i++ {
@@ -136,6 +139,69 @@ func (m *MySQL) InsertDB(table string, records [][]string) error {
 		for c := 0; c < colLen; c++ {
 			cols[c] = records[i][c]
 		}
+		// TODO: 以下で捨てているresのRowsAffectedを確認する？
+		_, err = stmt.Exec(cols...) // "1001", "2019/05/16", "4826", "4866", "4790", "4800", "5440600", "4800.0"
+		if err != nil {
+			return fmt.Errorf("failed to Exec: %v", err)
+		}
+	}
+	return nil
+}
+
+// InsertOrUpdateDB insert data to database
+func (m *MySQL) InsertOrUpdateDB(table string, records [][]string) error {
+	// insert対象のtable名とレコードを引数に取ってDBに書き込む
+	// 入力が空であればエラーを返す
+	if len(records) == 0 {
+		return fmt.Errorf("failed to InsertOrUpdateDB. input is empty")
+	}
+
+	res, err := m.SelectDB(fmt.Sprintf("SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='%s'", table))
+	if err != nil {
+		return fmt.Errorf("failed to fetch column name: %v", err)
+	}
+	if len(res) == 0 {
+		return fmt.Errorf("got no column name")
+	}
+	var columnName []string
+	for _, r := range res {
+		columnName = append(columnName, r[0])
+	}
+
+	// insertのprebare作成
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "INSERT INTO %s VALUES (", table)
+	columns := len(records[0]) // 項目数だけ?をつなげる
+	for i := 0; i < columns-1; i++ {
+		buf.WriteString("?,")
+	}
+	buf.WriteString("?) ON DUPLICATE KEY UPDATE ")
+
+	for i := 0; i < len(columnName)-1; i++ {
+		key := columnName[i]
+		buf.WriteString(fmt.Sprintf("%s = VALUES(%s), ", key, key)) // カンマ繋がりで複数指定
+	}
+	key := columnName[len(columnName)-1]
+	buf.WriteString(fmt.Sprintf("%s = VALUES(%s)", key, key)) // 最後のkey
+
+	// fmt.Println("InsertOrUpdateDB prepare:", buf.String()) // prepare
+
+	// Prepare statement for inserting data
+	stmt, err := m.db.Prepare(buf.String()) // INSERT INTO daily VALUES(?,?,?...,?) ON DUPLICATE KEY UPDATE
+	if err != nil {
+		return fmt.Errorf("failed to Prepare: %v", err)
+	}
+	defer stmt.Close() // Close the statement when we leave
+
+	colLen := len(records[0]) // １レコードあたりの項目数
+	for i := 0; i < len(records); i++ {
+		// Execは可変長引数のinterface型を受け取る
+		// ref. https://github.com/go-sql-driver/mysql/issues/115
+		cols := make([]interface{}, colLen)
+		for c := 0; c < colLen; c++ {
+			cols[c] = records[i][c]
+		}
+		// TODO: 以下で捨てているresのRowsAffectedを確認する？
 		_, err = stmt.Exec(cols...) // "1001", "2019/05/16", "4826", "4866", "4790", "4800", "5440600", "4800.0"
 		if err != nil {
 			return fmt.Errorf("failed to Exec: %v", err)
@@ -205,6 +271,35 @@ func (m *MySQL) SelectDB(q string) ([][]string, error) {
 		return nil, fmt.Errorf("row error: %v", err)
 	}
 	return retVals, nil
+}
+
+// DeleteFromDB delete data from database
+// Truncateメソッドを作らなかったのは事故を防ぐため
+func (m *MySQL) DeleteFromDB(table string, codes []string) error {
+	q := fmt.Sprintf("DELETE FROM %s WHERE code=?", table)
+	stmtDelete, err := m.db.Prepare(q)
+	if err != nil {
+		return fmt.Errorf("failed to Prepare: %w", err)
+	}
+	defer stmtDelete.Close()
+
+	for _, code := range codes {
+		result, err := stmtDelete.Exec(code)
+		if err != nil {
+			return fmt.Errorf("failed to delete Exec: %w, code: %s", err, code)
+		}
+
+		rowsAffect, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to get RowsAffected: %w, code: %s", err, code)
+		}
+
+		// 何も消されたものがなければエラーにする
+		if rowsAffect == 0 {
+			return fmt.Errorf("failed to delete code: %s from table: %s. no affected", code, table)
+		}
+	}
+	return nil
 }
 
 // CloseDB close database by db.Close()
