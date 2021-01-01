@@ -29,4 +29,4 @@ secretGenerator:
 - name: stockprice-secret
   literals:
   - DB_USER=root
-  - DB_PASSWORD=
+  - DB_PASSWORD=password
