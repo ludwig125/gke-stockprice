@@ -14,7 +14,7 @@ configMapGenerator:
   literals:
   - ENV=dev
   - MYSQLDUMP_TO_GOOGLEDRIVE=on
-  - DUMP_EXECUTE_DAYS=Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday # 毎日
+  - DUMP_EXECUTE_DAYS=Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday
   - DRIVE_FOLDER_NAME=gke-stockprice-dump-test
   - DRIVE_FILE_MIMETYPE=text/plain
   - DRIVE_NEED_TO_BACKUP=1
@@ -23,20 +23,20 @@ configMapGenerator:
   - DB_NAME=stockprice_dev
   - DUMP_TARGET_TABLES=daily,movingavg
   files:
-  - GROWTHTREND_TARGETDATE=growthtrend_targetdate.txt # integration_test内で動的に生成される
-  - DAILY_PRICE_URL=daily_price_url.txt # integration_test内で動的に生成される
+  - GROWTHTREND_TARGETDATE=growthtrend_targetdate.txt
+  - DAILY_PRICE_URL=daily_price_url.txt
 
 - name: sql-proxy-config
   behavior: create
   files:
-  - db_connection_name=db_connection_name.txt # integration_test内で動的に生成される
+  - db_connection_name=db_connection_name.txt
 
 secretGenerator:
 - name: stockprice-secret
   behavior: merge
   files:
-  - HOLIDAY_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
-  - COMPANYCODE_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
-  - TREND_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
-  - STATUS_SHEETID=dev_sheetid.txt # integration_test前に配置しておく
+  - HOLIDAY_SHEETID=dev_sheetid.txt
+  - COMPANYCODE_SHEETID=dev_sheetid.txt
+  - TREND_SHEETID=dev_sheetid.txt
+  - STATUS_SHEETID=dev_sheetid.txt
   - DRIVE_PERMISSION_GMAIL=gmail.txt

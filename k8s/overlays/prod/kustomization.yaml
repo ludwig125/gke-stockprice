@@ -30,7 +30,7 @@ configMapGenerator:
   - DB_PORT=3306
   - DB_NAME=stockprice
   - DUMP_TARGET_TABLES=daily,movingavg
-  - RESTRUCTURE_EXECUTE_DATE=2021/01/01
+  - RESTRUCTURE_EXECUTE_DATE=2021/01/02
   - RESTRUCTURE_FROM_DAILY_TABLE=daily
   - RESTRUCTURE_TO_MOVINGAVG_TABLE=movingavg_test
   - RESTRUCTURE_TO_TREND_TABLE=trend_test
@@ -39,21 +39,17 @@ configMapGenerator:
   - RESTRUCTURE_MAX_CONCURRENCY=20
 
   files:
-  # echo -n "value" > fileの形で事前に配置しておく
-  # echo -nする理由は、環境変数の末尾に改行コードが含まれないようにするため
   - DAILY_PRICE_URL=daily_price_url.txt
 
 - name: sql-proxy-config
   behavior: create
   literals:
-  - db_connection_name=gke-stockprice:us-central1:gke-stockprice-cloudsql-prod # 事前に作成されているprod用DBのConnectionName
+  - db_connection_name=gke-stockprice:us-central1:gke-stockprice-cloudsql-prod
 
 secretGenerator:
 - name: stockprice-secret
   behavior: merge
   files:
-  # echo -n "value" > fileの形で事前に配置しておく
-  # echo -nする理由は、環境変数の末尾に改行コードが含まれないようにするため
   - DB_USER=db_username.txt
   - DB_PASSWORD=db_password.txt
   - HOLIDAY_SHEETID=sheetid.txt
