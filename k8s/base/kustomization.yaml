@@ -20,7 +20,7 @@ configMapGenerator:
   - CALC_MOVINGAVG_CONCURRENCY=3
   - CALC_GROWTHTREND_CONCURRENCY=3
   - GROWTHTREND_TARGETDATE=""
-  - CREDENTIAL_FILEPATH=/credential/gke-stockprice-serviceaccount.json # 記載しているのは秘密鍵ファイルのパスのみ
+  - CREDENTIAL_FILEPATH=/credential/gke-stockprice-serviceaccount.json
 
 secretGenerator:
 - name: kube-gke-stockprice-serviceaccount
