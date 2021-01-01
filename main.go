@@ -152,7 +152,8 @@ func execProcess(ctx context.Context) error {
 			db:                    db,
 			sheet:                 trendSheet,
 			calcConcurrency:       strToInt(useEnvOrDefault("CALC_GROWTHTREND_CONCURRENCY", "3")),                               // 最大同時並行数
-			targetDate:            useEnvOrDefault("GROWTHTREND_TARGETDATE", time.Now().AddDate(0, 0, -1).Format("2006/01/02")), // defaultは起動日の前日
+			// targetDate:            useEnvOrDefault("GROWTHTREND_TARGETDATE", time.Now().AddDate(0, 0, -1).Format("2006/01/02")), // defaultは起動日の前日
+			targetDate:            growthTrendTargetDate()
 			longTermThresholdDays: 2,                                                                                            // TODO: どれくらいにすればいいか考える
 		},
 	}
@@ -210,6 +211,14 @@ func strToSlice(s string) []string {
 		ss = append(ss, v)
 	}
 	return ss
+}
+
+func growthTrendTargetDate() string {
+	date := os.Getenv("GROWTHTREND_TARGETDATE")
+	if date == "previous_date" {
+		return time.Now().AddDate(0, 0, -1).Format("2006/01/02") // defaultは起動日の前日
+	}
+	return date
 }
 
 func getDSN(usr, pwd, host string) string {
