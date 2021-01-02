@@ -6,7 +6,7 @@ commonLabels:
   variant: prod
 commonAnnotations:
   note: This is prod!
-resources:
+bases:
 - ../../base
 
 configMapGenerator:
@@ -31,7 +31,7 @@ configMapGenerator:
   - DB_PORT=3306
   - DB_NAME=stockprice
   - DUMP_TARGET_TABLES=daily,movingavg
-  - RESTRUCTURE_EXECUTE_DATE=2021/01/03
+  - RESTRUCTURE_EXECUTE_DATE=2021/01/04
   - RESTRUCTURE_FROM_DAILY_TABLE=daily
   - RESTRUCTURE_TO_MOVINGAVG_TABLE=movingavg_test
   - RESTRUCTURE_TO_TREND_TABLE=trend_test
