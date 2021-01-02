@@ -3,7 +3,7 @@ commonLabels:
   variant: dev
 commonAnnotations:
   note: This is dev!
-resources:
+bases:
 - ../../base
 patchesStrategicMerge:
 - map.yaml

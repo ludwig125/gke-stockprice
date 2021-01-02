@@ -314,10 +314,11 @@ func restructureTablesFromDaily(db database.DB, codes []string, statusSheet shee
 		return nil
 	}
 	today := time.Now().Format("2006/01/02")
-	if executeDate == today {
+	if executeDate != today {
 		log.Printf("RESTRUCTURE_EXECUTE_DATE(%s) is not today(%s). no need to restructure", executeDate, today)
 		return nil
 	}
+	log.Printf("RESTRUCTURE_EXECUTE_DATE(%s) is today(%s). Trying to restructure...", executeDate, today)
 
 	restructureConfig := RestructureTablesFromDailyConfig{
 		DB:                   db,
