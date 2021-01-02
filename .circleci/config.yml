@@ -125,12 +125,6 @@ jobs:
             chmod +x cloud_sql_proxy
             ls -l ./cloud_sql_proxy
       - run:
-          name: Install kustomize
-          # ref. https://github.com/kubernetes-sigs/kustomize/blob/master/docs/INSTALL.md#quickly-curl-the-latest-binary
-          command: |
-            curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-            ./kustomize version
-      - run:
           name: Activate Service Account
           command: |
             echo $GCLOUD_SERVICE_KEY | base64 -di > gke-stockprice-serviceaccount.json
@@ -280,12 +274,6 @@ jobs:
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
             source $BASH_ENV
             go version
-      - run:
-          name: Install kustomize
-          # ref. https://github.com/kubernetes-sigs/kustomize/blob/master/docs/INSTALL.md#quickly-curl-the-latest-binary
-          command: |
-            curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-            ./kustomize version
       - run:
           name: Activate Service Account
           command: |

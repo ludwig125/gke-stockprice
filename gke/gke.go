@@ -261,7 +261,9 @@ func (c Cluster) GetCredentials() error {
 // KustomizeBuildAndDeploy deploys gke.
 func KustomizeBuildAndDeploy(path string) error {
 	// path: ex. "./k8s/overlays/dev/"
-	cmd := fmt.Sprintf("./kustomize build %s | /usr/bin/kubectl apply -f -", path)
+	// kustomizeを別にインストールしていたらバージョンがあるとき2020/12/31ごろ 変わってうまく展開できなくなった。
+	// バージョンが変わるものはなるべく減らすためにkubectl kustomizeを使うことにする
+	cmd := fmt.Sprintf("/usr/bin/kubectl kustomize %s | /usr/bin/kubectl apply -f -", path)
 	res, err := command.ExecAndWait(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
