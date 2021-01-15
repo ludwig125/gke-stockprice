@@ -1,0 +1,356 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": 3,
+  "iteration": 1608585149716,
+  "links": [],
+  "panels": [
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "hiddenSeries": false,
+      "id": 2,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 3,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.4",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "/trend$/",
+          "color": "#F2CC0C",
+          "steppedLine": true,
+          "yaxis": 2
+        },
+        {
+          "alias": "/continuation$/",
+          "bars": true,
+          "color": "rgba(138, 184, 255, 0.18)",
+          "lines": false,
+          "yaxis": 2
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  UNIX_TIMESTAMP(`date`) AS \"time\",\r\n  code AS metric,\r\n  CAST(close AS UNSIGNED) AS \"close\"\r\nFROM daily\r\nWHERE\r\n  $__timeFilter(`date`)\r\n  AND code in ($code)\r\nORDER BY time\r\n",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  UNIX_TIMESTAMP(`date`) AS \"time\",\r\n  code AS metric,\r\n  CAST(moving5 AS DECIMAL(10,1)) AS \"moving5\",\r\n  CAST(moving20 AS DECIMAL(10,1)) AS \"moving20\",\r\n  CAST(moving60 AS DECIMAL(10,1)) AS \"moving60\",\r\n  CAST(moving100 AS DECIMAL(10,1)) AS \"moving100\"\r\nFROM movingavg\r\nWHERE\r\n  $__timeFilter(`date`)\r\n  AND code in ($code)\r\nORDER BY time",
+          "refId": "B",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  UNIX_TIMESTAMP(`date`) AS \"time\",\r\n  CONCAT(code,\"_trend\")  AS metric,\r\n  CAST(trend AS UNSIGNED) AS \"trend\"\r\nFROM trend\r\nWHERE\r\n  $__timeFilter(`date`)\r\n  AND code in ($code)\r\nORDER BY time",
+          "refId": "C",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  UNIX_TIMESTAMP(`date`) AS \"time\",\r\n  CONCAT(code,\"_continuation\")  AS metric,\r\n  CAST(continuationDays AS UNSIGNED) AS \"continuationDays\"\r\nFROM trend\r\nWHERE\r\n  $__timeFilter(`date`)\r\n  AND code in ($code)\r\nORDER BY time",
+          "refId": "D",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "stockprice",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "decimals": 1,
+          "format": "none",
+          "label": "yen",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "string",
+          "label": "trend",
+          "logBase": 1,
+          "max": "100",
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    }
+  ],
+  "refresh": false,
+  "schemaVersion": 26,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "allValue": null,
+        "current": {
+          "selected": true,
+          "tags": [],
+          "text": [
+            "1011"
+          ],
+          "value": [
+            "1011"
+          ]
+        },
+        "datasource": "MySQL",
+        "definition": "SELECT code FROM daily",
+        "error": null,
+        "hide": 0,
+        "includeAll": true,
+        "label": null,
+        "multi": true,
+        "name": "code",
+        "options": [
+          {
+            "selected": false,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": true,
+            "text": "1011",
+            "value": "1011"
+          },
+          {
+            "selected": false,
+            "text": "1012",
+            "value": "1012"
+          },
+          {
+            "selected": false,
+            "text": "1013",
+            "value": "1013"
+          },
+          {
+            "selected": false,
+            "text": "1014",
+            "value": "1014"
+          },
+          {
+            "selected": false,
+            "text": "1015",
+            "value": "1015"
+          },
+          {
+            "selected": false,
+            "text": "1016",
+            "value": "1016"
+          },
+          {
+            "selected": false,
+            "text": "1017",
+            "value": "1017"
+          },
+          {
+            "selected": false,
+            "text": "1018",
+            "value": "1018"
+          },
+          {
+            "selected": false,
+            "text": "1019",
+            "value": "1019"
+          },
+          {
+            "selected": false,
+            "text": "1020",
+            "value": "1020"
+          },
+          {
+            "selected": false,
+            "text": "1021",
+            "value": "1021"
+          },
+          {
+            "selected": false,
+            "text": "1022",
+            "value": "1022"
+          },
+          {
+            "selected": false,
+            "text": "1023",
+            "value": "1023"
+          }
+        ],
+        "query": "SELECT code FROM daily",
+        "refresh": 0,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "tagValuesQuery": "",
+        "tags": [],
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      }
+    ]
+  },
+  "time": {
+    "from": "now-100d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "stockprice_dev",
+  "uid": "DkqiZr1Mz",
+  "version": 7
+}
