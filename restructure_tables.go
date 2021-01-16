@@ -140,7 +140,8 @@ func (r *RestructureTablesFromDaily) Restructure() error {
 func (r *RestructureTablesFromDaily) restructureForEachCodes(targetCodes []string) error {
 	start := time.Now()
 	defer func() {
-		log.Println("restructureForEachCodes duration:", time.Since(start))
+		// TODO： codeや期間をログに残す？
+		log.Printf("restructureForEachCodes: %v, targetCode count: %d, from: %s, to: %s", time.Since(start), len(targetCodes), r.FromDate, r.ToDate)
 	}()
 
 	codeDateCloses, err := r.fetchCodesDateCloses(targetCodes)
@@ -169,8 +170,6 @@ func (r *RestructureTablesFromDaily) fetchCodesDateCloses(targetCodes []string) 
 		toDate = fmt.Sprintf("AND date <= '%s'", r.ToDate)
 	}
 	q := fmt.Sprintf("SELECT code, date, close FROM %s WHERE code in (%s) %s %s ORDER BY code, date DESC;", r.DailyTable, codes, fromDate, toDate)
-	// log.Println("query:", q)
-	// log.Println("restructure date:", r.FromDate, r.ToDate)
 	res, err := r.DB.SelectDB(q)
 	if err != nil {
 		return nil, fmt.Errorf("failed to selectTable %v", err)
@@ -182,6 +181,17 @@ func (r *RestructureTablesFromDaily) fetchCodesDateCloses(targetCodes []string) 
 	codeDateCloses := make(map[string][]DateClose, len(r.Codes))
 	var dcs []DateClose
 
+	// 以下、複数のcodeとdate が混じったデータを処理するので、
+	// currentCodeに現在扱っているcodeを格納して（以下の例だと最初は1001）、
+	// あるループでcodeがcurrentCodeと異なったら（以下の例だと1002が出現したら）、
+	// currentCodeを1002に入れ替えるという方法で区別して扱う
+	// 例
+	// 1001, 2020/1/3...
+	// 1001, 2020/1/2...
+	// 1001, 2020/1/1...
+	// 1002, 2020/1/3...
+	// 1002, 2020/1/2...
+	// 1002, 2020/1/1...
 	currentCode := ""
 	for i, r := range res {
 		code := r[0]
@@ -193,15 +203,23 @@ func (r *RestructureTablesFromDaily) fetchCodesDateCloses(targetCodes []string) 
 			currentCode = code
 		}
 		date := r[1]
-		// float64型数値に変換
-		// closeには小数点が入っていることがあるのでfloatで扱う
-		close, err := strconv.ParseFloat(r[2], 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to ParseFloat. %v", err)
-		}
-		// fmt.Println("code date closes", currentCode, code, date, f)
 
-		dcs = append(dcs, DateClose{Date: date, Close: close})
+		close := r[2]
+		var floatClose float64
+		if close != "--" { // スクレイピングした時に`--`で格納されていることがあったので、この場合は0.0にする
+			floatClose = 0
+			log.Printf("Warning. close is '--'. Use 0.0 alternatively. code: %s, date: %s", code, date)
+		} else {
+			// float64型数値に変換
+			// closeには小数点が入っていることがあるのでfloatで扱う
+			var err error
+			floatClose, err = strconv.ParseFloat(close, 64)
+			if err != nil {
+				return nil, fmt.Errorf("failed to ParseFloat. %v. code: %s, date: %s", err, code, date)
+			}
+		}
+
+		dcs = append(dcs, DateClose{Date: date, Close: floatClose})
 	}
 	codeDateCloses[currentCode] = dcs // 最後のcode分を格納
 
