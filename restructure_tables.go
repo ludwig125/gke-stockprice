@@ -141,7 +141,7 @@ func (r *RestructureTablesFromDaily) restructureForEachCodes(targetCodes []strin
 	start := time.Now()
 	defer func() {
 		// TODO： codeや期間をログに残す？
-		log.Printf("restructureForEachCodes: %v, targetCode count: %d, from: %s, to: %s", time.Since(start), len(targetCodes), r.FromDate, r.ToDate)
+		log.Printf("restructureForEachCodes duration: %v, target codes: %d, from-to: %s-%s", time.Since(start), len(targetCodes), r.FromDate, r.ToDate)
 	}()
 
 	codeDateCloses, err := r.fetchCodesDateCloses(targetCodes)
@@ -193,6 +193,7 @@ func (r *RestructureTablesFromDaily) fetchCodesDateCloses(targetCodes []string) 
 	// 1002, 2020/1/2...
 	// 1002, 2020/1/1...
 	currentCode := ""
+	prevClose := float64(1) // default 0だとgrowthRateの計算で0除算になってしまうので1とした
 	for i, r := range res {
 		code := r[0]
 		if i == 0 {
@@ -201,14 +202,15 @@ func (r *RestructureTablesFromDaily) fetchCodesDateCloses(targetCodes []string) 
 			codeDateCloses[currentCode] = dcs
 			dcs = nil
 			currentCode = code
+			prevClose = float64(1) // codeが変わったので1に戻す
 		}
 		date := r[1]
 
 		close := r[2]
 		var floatClose float64
-		if close != "--" { // スクレイピングした時に`--`で格納されていることがあったので、この場合は0.0にする
-			floatClose = 0
-			log.Printf("Warning. close is '--'. Use 0.0 alternatively. code: %s, date: %s", code, date)
+		if close == "--" { // スクレイピングした時に`--`で格納されていることがあったので、この場合は一つ前の値にする
+			floatClose = prevClose
+			log.Printf("Warning. close is '--'. Use previous close: %v alternatively. code: %s, date: %s", prevClose, code, date)
 		} else {
 			// float64型数値に変換
 			// closeには小数点が入っていることがあるのでfloatで扱う
@@ -218,6 +220,7 @@ func (r *RestructureTablesFromDaily) fetchCodesDateCloses(targetCodes []string) 
 				return nil, fmt.Errorf("failed to ParseFloat. %v. code: %s, date: %s", err, code, date)
 			}
 		}
+		prevClose = floatClose
 
 		dcs = append(dcs, DateClose{Date: date, Close: floatClose})
 	}
