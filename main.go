@@ -306,7 +306,6 @@ func fetchCompanyCode(s sheet.Sheet) ([]string, error) {
 func restructureTablesFromDaily(db database.DB, codes []string, statusSheet sheet.Sheet) error {
 	st := status.Status{Sheet: statusSheet} // Status管理用の変数
 	start := now()
-	defer st.InsertStatus("restructureTablesFromDaily", now(), now().Sub(start)) // now().Sub(start)で所要時間も入れておく
 
 	executeDate := os.Getenv("RESTRUCTURE_EXECUTE_DATE")
 	if executeDate == "" {
@@ -319,6 +318,10 @@ func restructureTablesFromDaily(db database.DB, codes []string, statusSheet shee
 		return nil
 	}
 	log.Printf("RESTRUCTURE_EXECUTE_DATE(%s) is today(%s). Trying to restructure...", executeDate, today)
+	defer func() {
+		st.InsertStatus("restructureTablesFromDaily", now(), now().Sub(start)) // now().Sub(start)で所要時間も入れておく
+		log.Println("restructureTablesFromDaily", now(), now().Sub(start))
+	}()
 
 	restructureConfig := RestructureTablesFromDailyConfig{
 		DB:                   db,

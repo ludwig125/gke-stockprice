@@ -542,9 +542,70 @@ cronjob.batch/prod-gke-stockprice   */1 * * * *   False     1        26h        
 $
 ```
 
+#### ログの確認
+
+- pod名が毎回変わるので、以下のようにpod名を取得してそのpodを指定している
+- `-f` をつけることでリアルタイムで表示させる
+
+```bash
+$kubectl logs -f $(kubectl get pod | grep stockprice | awk '{print $1}') -c gke-stockprice-container
+2021/01/16 07:30:42 ENV environment variable set
+以下略
+```
+
 #### 実行中のコンテナへのシェルを取得
 
 ```bash
 $ kubectl exec -it `kubectl get pods | grep stockprice | awk '{print $1}'` --container=gke-stockprice-container /bin/ash
 /go #
+```
+
+
+# データの復旧手順
+
+1. googledrive の `gke-stockprice-dump`の `stockprice-daily-XXXX.sql` をダウンロードする
+2. ダウンロードしたsqlファイルをもとにデータを入れなおすには以下の２つの場合に注意する必要がある
+2-1. **テーブルをゼロから作り直す場合は** そのファイルをCloudSQLに接続したMySQLクライアント上で以下のように読み込む
+```
+mysql> source  /mnt/c/Users/shingo/Downloads/stockprice-daily-2021-01-10.sql
+```
+
+2-2. **既存のテーブルにデータを追加したい場合は** 以下のようにファイルを修正したうえで、ファイルをCloudSQLに接続したMySQLクライアント上で以下のように読み込む
+
+修正内容1. 以下のように`DROP`と`CREATE`をコメントアウトする
+```
+
+-- DROP TABLE IF EXISTS `daily`;
+-- CREATE TABLE `daily` (
+--   `code` varchar(10) NOT NULL,
+--   `date` varchar(10) NOT NULL,
+--   `open` varchar(15) DEFAULT NULL,
+--   `high` varchar(15) DEFAULT NULL,
+--   `low` varchar(15) DEFAULT NULL,
+--   `close` varchar(15) DEFAULT NULL,
+--   `turnover` varchar(15) DEFAULT NULL,
+--   `modified` varchar(15) DEFAULT NULL,
+--   PRIMARY KEY (`code`,`date`)
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+```
+
+修正内容2. `INSERT`を`INSERT IGNORE` に置換する
+
+- IGNOREをつけることで、PKがかぶったデータがすでにあればスルーするのでエラーにならない
+- INSERT IGNOREだとINSERTできない場合などのエラーも無視してしまうので、より安全なのは`INSERT INTO ... ON DUPLICATE KEY UPDATE`がよさそう
+
+修正が終わったら読み込む
+```
+mysql> source  /mnt/c/Users/shingo/Downloads/stockprice-daily-2021-01-10.sql
+```
+
+3. 当日の`create_gke_cluster_and_deploy_by_golang` ジョブをcircleciで実行する
+
+- spreadsheetの **status**の当日分の実行結果を削除しておかないと、status.goの`ExecIfIncompleteThisDay`の機能で、当日分はすでに実行済みと判断されて何もされないのでspreadsheetのstatusのデータを消しておく
+
+例：以下のような部分を削除しておく
+```
+saveStockPrice	1610650313	2021/01/15 3:51:53	36m26.589424776s
+saveMovingAvgs	1610650603	2021/01/15 3:56:43	4m38.80397984s
+calculateGrowthTrend	1610651343	2021/01/15 4:09:03	12m19.514307946s
 ```
