@@ -232,7 +232,7 @@ func (m MySQLDumper) execCmdAndUpload(ctx context.Context, folderID, tableName s
 		Overwrite:   false,
 	}
 
-	c, err := googledrive.NewCommandResultUpload(m.Service, cmd, fi)
+	c, err := googledrive.NewCommandResultUpload(m.Service, cmd, fi, 0)
 	if err != nil {
 		return fmt.Errorf("failed to NewCommandResultUpload: %v", err)
 	}
