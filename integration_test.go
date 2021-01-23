@@ -365,7 +365,7 @@ func uploadKubectlLog(ctx context.Context, srv *drive.Service, folderName, permi
 	}
 
 	cmd := "kubectl logs $(kubectl get pods | grep stockprice | awk '{print $1}') -c gke-stockprice-container"
-	c, err := googledrive.NewCommandResultUpload(srv, cmd, fi)
+	c, err := googledrive.NewCommandResultUpload(srv, cmd, fi, -1)
 	if err != nil {
 		return fmt.Errorf("failed to NewCommandResultUpload: %v", err)
 	}
