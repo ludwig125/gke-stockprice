@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -15,23 +17,30 @@ import (
 
 // CommandResultUpload is struct to command result upload.
 type CommandResultUpload struct {
-	Srv      *drive.Service
-	Command  string
-	FileInfo FileInfo
-	Shell    string
+	Srv                *drive.Service
+	Command            string
+	FileInfo           FileInfo
+	Shell              string
+	PrintNLinesAtLocal int // n: デバッグ用に末尾n行をローカルに出力. 0: 出力なし. -1: 全部出力
 }
 
 // NewCommandResultUpload create new CommandResultUpload.
-func NewCommandResultUpload(srv *drive.Service, cmd string, fileInfo FileInfo) (*CommandResultUpload, error) {
+func NewCommandResultUpload(srv *drive.Service, cmd string, fileInfo FileInfo, n int) (*CommandResultUpload, error) {
 	sh, err := getShell()
 	if err != nil {
 		return nil, fmt.Errorf("failed to getShell: %v", err)
 	}
+
+	if n < -1 {
+		return nil, fmt.Errorf("invalid PrintNLinesAtLocal: %d. PrintNLinesAtLocal should not be less than -1", n)
+	}
+
 	return &CommandResultUpload{
-		Srv:      srv,
-		Command:  cmd,
-		FileInfo: fileInfo,
-		Shell:    sh,
+		Srv:                srv,
+		Command:            cmd,
+		FileInfo:           fileInfo,
+		Shell:              sh,
+		PrintNLinesAtLocal: n,
 	}, nil
 }
 
@@ -56,9 +65,15 @@ func (c CommandResultUpload) Exec(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to commandExec: %v", err)
 	}
+
 	go func() {
 		scan(stderr)
 	}()
+
+	// stdoutの中身をローカルにも出力させるためにTeeReaderで分岐させる
+	// TeeReaderの返り値はio.Readerなので、io.ReadCloser にするためにioutil.NopCloserを経由させる
+	p := localPrinter{lines: c.PrintNLinesAtLocal}
+	stdout = ioutil.NopCloser(io.TeeReader(stdout, &p))
 
 	if err := UploadFile(c.Srv, stdout, c.FileInfo); err != nil {
 		cancel()
@@ -99,4 +114,48 @@ func scan(s io.ReadCloser) {
 		l := scanner.Text()
 		log.Println(l)
 	}
+}
+
+type localPrinter struct {
+	lines int
+}
+
+// io.Writer の要件を満たすためにWriteメソッドを実装
+func (p *localPrinter) Write(data []byte) (int, error) {
+	n := len(data)
+
+	if p.lines == 0 {
+		// ローカルには何も出力しない
+		return n, nil
+	}
+
+	if p.lines == -1 {
+		// ローカルに全部出力
+		fmt.Fprintf(os.Stdout, "print all lines among upload file\n")
+		w := os.Stdout
+		w.Write(data)
+		return n, nil
+	}
+
+	fmt.Fprintf(os.Stdout, "print last %d lines among upload file\n", p.lines)
+	// 改行で分割
+	contents := strings.Split(string(data), "\n")
+
+	// contents sliceの最後のp.lines分を出力させるために要素を計算する
+	// 例：全部で５行の出力のうち、最後の３行を出力したいのであれば、5-3=2なので、 contents[2:]で出力させる
+	// 実際にはcontentsの末尾は改行コードが入っているので、さらに-1する必要がある
+	// 例えば、元のデータが１～５までの数字が各行にある場合、改行でSplitするとcontentsの中身は以下のようになる
+	// contents [1 2 3 4 5 ] <- 最後に空白があるので全部で６要素ある
+	lines := len(contents) - p.lines - 1
+	if lines < 0 { // p.linesが全要素数より多かったら全要素を出力させる
+		lines = 0
+	}
+	if lines >= len(contents) {
+		lines = 0
+	}
+	for _, v := range contents[lines:] {
+		fmt.Fprintf(os.Stdout, "%s\n", v)
+	}
+
+	return n, nil
 }

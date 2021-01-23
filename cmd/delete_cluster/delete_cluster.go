@@ -109,7 +109,8 @@ func uploadToGoogleDrive(ctx context.Context, srv *drive.Service, folderName, pe
 		Overwrite:   true,
 	}
 
-	c, err := googledrive.NewCommandResultUpload(srv, cmd, fi)
+	// ログの最後の20行をデバッグ用に出力させる
+	c, err := googledrive.NewCommandResultUpload(srv, cmd, fi, 20)
 	if err != nil {
 		return fmt.Errorf("failed to NewCommandResultUpload: %v", err)
 	}

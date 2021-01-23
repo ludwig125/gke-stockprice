@@ -147,112 +147,6 @@ jobs:
             go test -v ./... -tags integration -timeout 30m
           # TODO： integration_test後にclusterが無くなっているか確認するステップを入れる
 
-  # create_gke_cluster:
-  #   working_directory: ~/go/src/github.com/ludwig125 # この設定によって、stepsのcheckout時にworking_directory以下にgke-stockpriceリポジトリがgit cloneされる
-  #   environment:
-  #     PROJECT_NAME: gke-stockprice
-  #     CLOUDSQL_INSTANCE: gke-stockprice-cloudsql-prod
-  #     CLUSTER_NAME: gke-stockprice-cluster-prod
-  #     COMPUTE_ZONE: us-central1-f
-  #     #MACHINE_TYPE: n1-standard-4
-  #     MACHINE_TYPE: g1-small
-  #     NUM_NODES: 3 # 2だと`nodes are available: 1 Insufficient memory, 2 Insufficient cpu.` となったので
-  #   docker:
-  #     - image: google/cloud-sdk:alpine
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         name: Set gcloud
-  #         command: |
-  #           # cloud-sdk:alpineの場合はbase64 -iがない
-  #           echo $GCLOUD_SERVICE_KEY | base64 -d > ${HOME}/service_account.json
-  #           gcloud auth activate-service-account --key-file ${HOME}/service_account.json
-  #     - run:
-  #         name: Setup GKE Cluster Infomation
-  #         command: |
-  #           gcloud config set project ${PROJECT_NAME}
-  #           gcloud config set compute/zone ${COMPUTE_ZONE}
-  #     - run:
-  #         name: Check Cloud SQL Instance
-  #         command: |
-  #           # cloud sql instanceの存在確認
-  #           # gcloud sql instances listの結果が0だと、`Listed 0 items.`が出力されるので/dev/nullに捨てる
-  #           if [ `gcloud sql instances list 2> /dev/null | grep $CLOUDSQL_INSTANCE | wc -l` -eq 0 ]; then
-  #               echo "failed to find cloudsql instance:" $CLOUDSQL_INSTANCE
-  #               return 1
-  #           fi
-  #     - run:
-  #         name: Create GKE Cluster
-  #         no_output_timeout: 20m # これを防ぐ：Too long with no output (exceeded 10m0s)
-  #         command: |
-  #           if [ `gcloud container clusters list | grep $CLUSTER_NAME | wc -l` == 1 ]; then
-  #               # TODO: --preemptibleをつける？
-  #               # clusterが存在する場合、ERRORになっていないか確認
-  #               if [ `gcloud container clusters describe $CLUSTER_NAME | grep 'ERROR' | wc -l` != 0 ]; then
-  #                   # うまく作れていないときは消してからもう一度作る
-  #                   gcloud --quiet container clusters delete $CLUSTER_NAME
-  #                   gcloud --quiet container clusters create $CLUSTER_NAME \
-  #                   --machine-type=$MACHINE_TYPE --disk-size 10 --zone $COMPUTE_ZONE \
-  #                   --num-nodes=$NUM_NODES --preemptible
-  #               fi
-  #           elif [ `gcloud container clusters list | grep $CLUSTER_NAME | wc -l` == 0 ]; then
-  #               # clusterが存在しない場合はcreate
-  #               # --quiet をつけないと作成するかどうかy/nの入力を求める表示が出る
-  #               gcloud --quiet container clusters create $CLUSTER_NAME \
-  #               --machine-type=$MACHINE_TYPE --disk-size 10 --zone $COMPUTE_ZONE \
-  #               --num-nodes=$NUM_NODES --preemptible
-  #           else
-  #               echo "$CLUSTER_NAME cluster already exists"
-  #           fi
-  #     - run:
-  #         name: Check GKE Cluster
-  #         command: gcloud container clusters list
-
-  # deploy_gke_stockprice:
-  #   working_directory: ~/go/src/github.com/ludwig125
-  #   environment:
-  #     PROJECT_NAME: gke-stockprice
-  #     CLUSTER_NAME: gke-stockprice-cluster-prod
-  #     COMPUTE_ZONE: us-central1-f
-  #   docker:
-  #     - image: google/cloud-sdk
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         name: Setup CLOUD SDK
-  #         command: |
-  #           # base64 -i ignore non-alphabet characters
-  #           echo $GCLOUD_SERVICE_KEY | base64 -di > ${HOME}/gcloud-service-key.json
-  #           gcloud auth activate-service-account --key-file ${HOME}/gcloud-service-key.json
-  #     - run:
-  #         name: Setup GKE Cluster Infomation
-  #         command: |
-  #           gcloud config set project $PROJECT_NAME
-  #           gcloud config set container/cluster $CLUSTER_NAME
-  #           gcloud config set compute/zone ${COMPUTE_ZONE}
-  #           gcloud container clusters get-credentials $CLUSTER_NAME
-  #     - run:
-  #         name: Create config & secret
-  #         command: |
-  #           echo ${GCLOUD_SERVICE_KEY} | base64 -di > ./k8s/base/gke-stockprice-serviceaccount.json
-  #           echo -n ${DAILY_PRICE_URL} > ./k8s/overlays/prod/daily_price_url.txt
-  #           echo -n ${PROD_DB_USERNAME} > ./k8s/overlays/prod/db_username.txt
-  #           echo -n ${PROD_DB_PASSWORD} > ./k8s/overlays/prod/db_password.txt
-  #           echo -n ${PROD_SHEET_ID} > ./k8s/overlays/prod/sheetid.txt
-  #           echo -n ${SLACK_TOKEN} > ./k8s/overlays/prod/slack_token.txt
-  #           echo -n ${SLACK_CHANNEL} > ./k8s/overlays/prod/slack_channel.txt
-  #           echo -n ${CIRCLE_API_USER_TOKEN} > ./k8s/overlays/prod/circleci_token.txt
-  #           echo -n ${GMAIL} > ./k8s/overlays/prod/gmail.txt
-  #     - run:
-  #         name: Install kustomize
-  #         # ref. https://github.com/kubernetes-sigs/kustomize/blob/master/docs/INSTALL.md#quickly-curl-the-latest-binary
-  #         command: |
-  #           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-  #           ./kustomize version
-  #     - deploy:
-  #         name: Kustomize build and Apply
-  #         command: ./kustomize build ./k8s/overlays/prod/ | kubectl apply -f -
-
   create_gke_cluster_and_deploy_by_golang:
     working_directory: ~/go/src/github.com/ludwig125 # この設定によって、stepsのcheckout時にworking_directory以下にgke-stockpriceリポジトリがgit cloneされる
     environment:
@@ -274,6 +168,9 @@ jobs:
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
             source $BASH_ENV
             go version
+      - run:
+          name: Check gcloud version
+          command: gcloud --version
       - run:
           name: Activate Service Account
           command: |
@@ -303,57 +200,10 @@ jobs:
             export DRIVE_PERMISSION_GMAIL=${GMAIL}
             go run cmd/create_cluster_and_deploy/create_cluster_and_deploy.go
 
-  # delete_gke_cluster:
-  #   working_directory: ~/go/src/github.com/ludwig125
-  #   environment:
-  #     PROJECT_NAME: gke-stockprice
-  #     CLUSTER_NAME: gke-stockprice-cluster-prod
-  #     COMPUTE_ZONE: us-central1-f
-  #     CRON_JOB: prod-gke-stockprice
-  #   docker:
-  #     - image: google/cloud-sdk # kubectlを使うのでalpineではない
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         name: Set gcloud
-  #         command: |
-  #           echo $GCLOUD_SERVICE_KEY | base64 -di > ${HOME}/service_account.json
-  #           gcloud auth activate-service-account --key-file ${HOME}/service_account.json
-  #     - run:
-  #         name: Setup GKE Cluster Infomation
-  #         command: |
-  #           gcloud config set project $PROJECT_NAME
-  #           gcloud config set container/cluster $CLUSTER_NAME
-  #           gcloud config set compute/zone ${COMPUTE_ZONE}
-  #           gcloud container clusters get-credentials $CLUSTER_NAME
-  #     - run:
-  #         name: Delete GKE Cluster
-  #         command: |
-  #           # clusterが存在する場合のみdelete
-  #           if [ `gcloud container clusters list | grep $CLUSTER_NAME | wc -l` == 1 ]; then
-  #             # clusterが存在してもStop中のこともあるのでRUNNINGのときだけdelete
-  #             if [ `gcloud container clusters describe $CLUSTER_NAME | grep 'RUNNING' | wc -l` -gt 0 ]; then
-  #               if [ `kubectl get cronjobs 2> /dev/null | grep $CRON_JOB | wc -l` == 1 ]; then
-  #                 # deleteには時間がかかるので先にcronjobを消す
-  #                 kubectl delete cronjob $CRON_JOB
-  #               fi
-  #               # clusterの削除
-  #               # --quiet をつけないと削除するかどうかy/nの入力を求める表示が出る
-  #               gcloud --quiet container clusters delete $CLUSTER_NAME
-  #             fi
-  #           else
-  #             echo "$CLUSTER_NAME cluster does not exist"
-  #           fi
-  #     - run:
-  #         name: Check GKE Cluster
-  #         command: gcloud container clusters list
-
   delete_gke_cluster_by_golang:
     working_directory: ~/go/src/github.com/ludwig125
     environment:
       PROJECT_NAME: gke-stockprice
-      # CLUSTER_NAME: gke-stockprice-cluster-prod
-      # COMPUTE_ZONE: us-central1-f
       GO_VERSION: 1.14.1
     docker:
       - image: google/cloud-sdk # kubectlを使うのでalpineではない
@@ -371,6 +221,9 @@ jobs:
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
             source $BASH_ENV
             go version
+      - run:
+          name: Check gcloud version
+          command: gcloud --version
       - run:
           name: Activate Service Account
           command: |
