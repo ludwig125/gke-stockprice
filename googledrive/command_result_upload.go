@@ -25,14 +25,25 @@ type CommandResultUpload struct {
 }
 
 // NewCommandResultUpload create new CommandResultUpload.
-func NewCommandResultUpload(srv *drive.Service, cmd string, fileInfo FileInfo, n int) (*CommandResultUpload, error) {
+func NewCommandResultUpload(srv *drive.Service, cmd string, fileInfo FileInfo, printNLinesAtLocal int) (*CommandResultUpload, error) {
 	sh, err := getShell()
 	if err != nil {
 		return nil, fmt.Errorf("failed to getShell: %v", err)
 	}
 
-	if n < -1 {
-		return nil, fmt.Errorf("invalid PrintNLinesAtLocal: %d. PrintNLinesAtLocal should not be less than -1", n)
+	if printNLinesAtLocal < -1 {
+		return nil, fmt.Errorf("invalid PrintNLinesAtLocal: %d. PrintNLinesAtLocal should not be less than -1", printNLinesAtLocal)
+	}
+	switch printNLinesAtLocal {
+	case 0:
+		// ローカルには何も出力しない
+		fmt.Println("==== Print no lines among upload file ====")
+	case -1:
+		// ローカルに全部出力
+		fmt.Println("==== Print all lines among upload file ====")
+	default:
+		// ローカルに最後のN行だけ出力
+		fmt.Printf("==== Print last %d lines among upload file ====\n", printNLinesAtLocal)
 	}
 
 	return &CommandResultUpload{
@@ -40,7 +51,7 @@ func NewCommandResultUpload(srv *drive.Service, cmd string, fileInfo FileInfo, n
 		Command:            cmd,
 		FileInfo:           fileInfo,
 		Shell:              sh,
-		PrintNLinesAtLocal: n,
+		PrintNLinesAtLocal: printNLinesAtLocal,
 	}, nil
 }
 
@@ -124,23 +135,15 @@ type localPrinter struct {
 func (p *localPrinter) Write(data []byte) (int, error) {
 	n := len(data)
 
-	if p.lines == 0 {
-		// ローカルには何も出力しない
-		return n, nil
-	}
-
 	if p.lines == -1 {
 		// ローカルに全部出力
-		fmt.Fprintf(os.Stdout, "print all lines among upload file\n")
 		w := os.Stdout
 		w.Write(data)
 		return n, nil
 	}
 
-	fmt.Fprintf(os.Stdout, "print last %d lines among upload file\n", p.lines)
 	// 改行で分割
 	contents := strings.Split(string(data), "\n")
-
 	// contents sliceの最後のp.lines分を出力させるために要素を計算する
 	// 例：全部で５行の出力のうち、最後の３行を出力したいのであれば、5-3=2なので、 contents[2:]で出力させる
 	// 実際にはcontentsの末尾は改行コードが入っているので、さらに-1する必要がある
