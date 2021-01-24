@@ -50,11 +50,11 @@ func TestCommandResultUpload(t *testing.T) {
 	}{
 		"no_output_to_Stdout": {
 			localPrintLines: 0,
-			wantOutput:      "",
+			wantOutput:      "==== Print no lines among upload file ====",
 		},
 		"all_output_to_Stdout": {
 			localPrintLines: -1,
-			wantOutput: `print all lines among upload file
+			wantOutput: `==== Print all lines among upload file ====
 1
 2
 3
@@ -63,7 +63,7 @@ func TestCommandResultUpload(t *testing.T) {
 		},
 		"last3_output_to_Stdout": {
 			localPrintLines: 3,
-			wantOutput: `print last 3 lines among upload file
+			wantOutput: `==== Print last 3 lines among upload file ====
 3
 4
 5`, // 最後の３行のみ出力する
@@ -80,7 +80,7 @@ func TestCommandResultUpload(t *testing.T) {
 			os.Stdout = w
 			// Stdoutの結果テスト用ここまで
 
-			fileName := "googledrive-test-file"
+			fileName := "googledrive-command-result-uploader-test-file"
 			mimeType := "text/plain"
 			fi := FileInfo{
 				Name:        fileName,
