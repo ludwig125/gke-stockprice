@@ -254,6 +254,12 @@ func (c Cluster) GetCredentials() error {
 	if err != nil {
 		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
 	}
+
+	cmd = "gcloud config list" // gcloud config listの結果を出力させる
+	res, err = command.ExecAndWait(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to ExecAndWait: %v, cmd: %s, res: %#v", err, cmd, res)
+	}
 	log.Println("get-credentials successfully")
 	return nil
 }

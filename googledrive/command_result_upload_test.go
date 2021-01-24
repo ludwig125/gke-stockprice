@@ -21,7 +21,7 @@ func TestCommandResultUpload(t *testing.T) {
 		t.Fatalf("failed to GetDriveService: %v", err)
 	}
 
-	folderName := "gke-stockprice-googledrive-test-folder"
+	folderName := "gke-stockprice-googledrive-commandresultupload-test-folder"
 	folderID, err := GetFolderIDOrCreate(srv, folderName, "") // permission共有Gmailは空. この場合ユーザにはUIから見ることはできないことに注意
 	if err != nil {
 		t.Fatalf("failed to GetFolderIDOrCreate: %v", err)
