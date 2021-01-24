@@ -12,13 +12,6 @@ import (
 )
 
 func main() {
-	// ctx, cancel := context.WithCancel(context.Background())
-	// defer cancel()
-	// credential := mustGetenv("CREDENTIAL_FILEPATH")
-	// dSrv, err := googledrive.GetDriveService(ctx, credential) // rootディレクトリに置いてあるserviceaccountのjsonを使う
-	// if err != nil {
-	// 	log.Fatalf("failed to GetDriveService: %v", err)
-	// }
 	clusterConfig := gke.ClusterConfig{
 		ClusterName: "gke-stockprice-cluster-prod", // TODO: 環境変数から取得したほうがいいかどうか?
 		ComputeZone: "us-central1-f",
@@ -60,12 +53,6 @@ func main() {
 		log.Fatalf("GKE cluster not exists. failed to create cluster")
 	}
 	log.Println("GKE cluster exist")
-
-	// TODO: 以下はcircleci側で実行するので不要？
-	// // kubernetesデプロイ前に必要なファイルを配置
-	// if err := setFiles(sqlConnectionName); err != nil {
-	// 	return fmt.Errorf("failed to setFiles: %v", err)
-	// }
 
 	// deployの前にクラスタの認証が必要
 	if err := cluster.GetCredentials(); err != nil {
