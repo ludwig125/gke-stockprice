@@ -12,11 +12,12 @@ import (
 )
 
 type daily struct {
-	status               sheet.Sheet
-	dayoff               DayOff
-	dailyStockPrice      DailyStockPrice
-	calculateMovingAvg   CalculateMovingAvg
-	calculateGrowthTrend CalculateGrowthTrend
+	status                       sheet.Sheet
+	dayoff                       DayOff
+	dailyStockPrice              DailyStockPrice
+	calculateDailyMovingAvgTrend CalculateDailyMovingAvgTrend
+	// calculateMovingAvg   CalculateMovingAvg
+	// calculateGrowthTrend CalculateGrowthTrend
 }
 
 func (d daily) exec(ctx context.Context, codes []string) error {
@@ -92,23 +93,33 @@ func (d daily) exec(ctx context.Context, codes []string) error {
 		return fmt.Errorf("all codes failed in saveStockPrice: %v", mergeErr(nil, failedCodes))
 	}
 
-	// 移動平均線の作成とDBへの書き込み
+	// 移動平均線とTrendの作成とDBへの書き込み
 	// statusシートを見て本日分が未完了であれば実行する
-	m := d.calculateMovingAvg
+	m := d.calculateDailyMovingAvgTrend
 	if err := st.ExecIfIncompleteThisDay("saveMovingAvgs", now(), func() error {
-		return m.saveMovingAvgs(ctx, targetCodes)
+		// TODO: fromは、最後に書き込みが行われた時間を確認したうえで設定してもイイかも
+		return m.Exec(targetCodes)
 	}); err != nil {
 		return fmt.Errorf("failed to saveMovingAvgs: %v", mergeErr(err, failedCodes))
 	}
 
-	// 株価の増減トレンドをSpreadSheetに記載
-	// statusシートを見て本日分が未完了であれば実行する
-	g := d.calculateGrowthTrend
-	if err := st.ExecIfIncompleteThisDay("calculateGrowthTrend", now(), func() error {
-		return g.growthTrend(ctx, targetCodes)
-	}); err != nil {
-		return fmt.Errorf("failed to growthTrend: %v", mergeErr(err, failedCodes))
-	}
+	// // 移動平均線の作成とDBへの書き込み
+	// // statusシートを見て本日分が未完了であれば実行する
+	// m := d.calculateMovingAvg
+	// if err := st.ExecIfIncompleteThisDay("saveMovingAvgs", now(), func() error {
+	// 	return m.saveMovingAvgs(ctx, targetCodes)
+	// }); err != nil {
+	// 	return fmt.Errorf("failed to saveMovingAvgs: %v", mergeErr(err, failedCodes))
+	// }
+
+	// // 株価の増減トレンドをSpreadSheetに記載
+	// // statusシートを見て本日分が未完了であれば実行する
+	// g := d.calculateGrowthTrend
+	// if err := st.ExecIfIncompleteThisDay("calculateGrowthTrend", now(), func() error {
+	// 	return g.growthTrend(ctx, targetCodes)
+	// }); err != nil {
+	// 	return fmt.Errorf("failed to growthTrend: %v", mergeErr(err, failedCodes))
+	// }
 
 	return mergeErr(nil, failedCodes)
 }

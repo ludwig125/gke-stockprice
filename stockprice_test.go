@@ -192,7 +192,7 @@ func TestScrape(t *testing.T) {
 
 			sp := DailyStockPrice{
 				dailyStockpriceURL: ts.URL,
-				fetchTimeout:       10 * time.Millisecond,
+				fetchTimeout:       10 * time.Second,
 			}
 			currentTime := time.Date(2019, 12, 1, 0, 0, 0, 0, time.Local)
 			prices, err := sp.scrape(ctx, tc.code, currentTime)

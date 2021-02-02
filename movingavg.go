@@ -44,10 +44,10 @@ func codeDateMovingavgsToStringSlice(code string, dateMovingAvgs DateMovingAvgs)
 		// 小数点以下の0しかない部分は入れないために%gを使う
 		return fmt.Sprintf("%g", f)
 	}
-	m := dateMovingAvgs.movingAvgs
+	m := dateMovingAvgs.MovingAvgs
 	return []string{
 		code,
-		dateMovingAvgs.date,
+		dateMovingAvgs.Date,
 		trim(m.M3),
 		trim(m.M5),
 		trim(m.M7),
@@ -116,8 +116,8 @@ func (m CalculateMovingAvg) movingAvgs(code string) ([]DateMovingAvgs, error) {
 	for _, r := range rc {
 		d := r.Date // 日付
 		dm := DateMovingAvgs{
-			date: d,
-			movingAvgs: MovingAvgs{
+			Date: d,
+			MovingAvgs: MovingAvgs{
 				M3:   moving[3][d],
 				M5:   moving[5][d],
 				M7:   moving[7][d],
@@ -140,11 +140,11 @@ func (m CalculateMovingAvg) recentCloses(code string) (DateCloses, error) {
 
 // DateMovingAvgs has date, movingAvgs(3, 5, 7, 10, 20, 60, 100).
 type DateMovingAvgs struct {
-	date       string
-	movingAvgs MovingAvgs
+	Date       string
+	MovingAvgs MovingAvgs
 }
 
-// MovingAvgs has each moving average
+// MovingAvgs has each moving average.
 type MovingAvgs struct {
 	M3   float64
 	M5   float64
@@ -155,14 +155,22 @@ type MovingAvgs struct {
 	M100 float64
 }
 
-// DateClose has Date and Close
+// DateClose has Date and Close.
 type DateClose struct {
 	Date  string
 	Close float64
 }
 
-// DateCloses has Date and Closes
+// DateCloses has Date and Closes.
 type DateCloses []DateClose
+
+func (d DateCloses) closes() []float64 {
+	closes := make([]float64, len(d))
+	for i, v := range d {
+		closes[i] = v.Close
+	}
+	return closes
+}
 
 func (d DateCloses) calcMovingAvg(days int) map[string]float64 {
 	dateMoving := make(map[string]float64) // 日付と移動平均のMap
