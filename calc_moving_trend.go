@@ -1,67 +1,65 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"sort"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/ludwig125/gke-stockprice/database"
+	"github.com/pkg/errors"
 )
 
-// daily table からmovingavgとtrend tableを作り直す
+// daily table からmovingavgとtrend を計算してDBに格納する
 
-// RestructureTablesFromDaily is struct for restructuring db.
-type RestructureTablesFromDaily struct {
+// CalcMovingTrend is struct.
+type CalcMovingTrend struct {
 	DB                    database.DB
 	DailyTable            string
 	MovingAvgTable        string
 	TrendTable            string
 	Codes                 []string
-	RestructureMovingavg  bool
-	RestructureTrend      bool
 	FromDate              string
 	ToDate                string
 	MaxConcurrency        int
 	LongTermThresholdDays int
+	// RestructureMovingavg  bool
+	// RestructureTrend      bool
 }
 
-// RestructureTablesFromDailyConfig is config for RestructureTablesFromDaily.
-type RestructureTablesFromDailyConfig struct {
+// CalcMovingTrendConfig is config for CalcMovingTrend.
+type CalcMovingTrendConfig struct {
 	DB                    database.DB
 	DailyTable            string
 	MovingAvgTable        string
 	TrendTable            string
 	Codes                 []string
-	RestructureMovingavg  bool
-	RestructureTrend      bool
 	FromDate              string
 	ToDate                string
 	MaxConcurrency        int
 	LongTermThresholdDays int
+	// RestructureMovingavg  bool
+	// RestructureTrend      bool
 }
 
-// NewRestructureTablesFromDaily returns new RestructureTablesFromDaily.
-func NewRestructureTablesFromDaily(r RestructureTablesFromDailyConfig) (*RestructureTablesFromDaily, error) {
-	if r.DB == nil {
+// NewCalcMovingTrend returns new CalcMovingTrend.
+func NewCalcMovingTrend(c CalcMovingTrendConfig) (*CalcMovingTrend, error) {
+	if c.DB == nil {
 		return nil, errors.New("no database")
 	}
-	if r.DailyTable == "" {
+	if c.DailyTable == "" {
 		return nil, errors.New("no DailyTable")
 	}
-	if r.MovingAvgTable == "" {
+	if c.MovingAvgTable == "" {
 		return nil, errors.New("no MovingAvgTable")
 	}
-	if r.TrendTable == "" {
+	if c.TrendTable == "" {
 		return nil, errors.New("no TrendTable")
 	}
-	if len(r.Codes) == 0 {
+	if len(c.Codes) == 0 {
 		return nil, errors.New("no codes")
 	}
-	sort.Strings(r.Codes) // codesを昇順でソート
+	sort.Strings(c.Codes) // codesを昇順でソート
 
 	checkTimeValidation := func(v string) (string, error) {
 		t, err := time.Parse("2006/01/02", v)
@@ -73,183 +71,113 @@ func NewRestructureTablesFromDaily(r RestructureTablesFromDailyConfig) (*Restruc
 
 	// デフォルトでは10日前
 	fromDate := time.Now().AddDate(0, 0, -10).Format("2006/01/02")
-	if r.FromDate != "" {
-		t, err := checkTimeValidation(r.FromDate)
+	if c.FromDate != "" {
+		t, err := checkTimeValidation(c.FromDate)
 		if err != nil {
 			return nil, fmt.Errorf("failed to checkTimeValidation: %v", err)
 		}
 		fromDate = t
 	}
 	toDate := time.Now().Format("2006/01/02")
-	if r.ToDate != "" {
-		t, err := checkTimeValidation(r.ToDate)
+	if c.ToDate != "" {
+		t, err := checkTimeValidation(c.ToDate)
 		if err != nil {
 			return nil, fmt.Errorf("failed to checkTimeValidation: %v", err)
 		}
 		toDate = t
 	}
 	maxConcurrency := 1
-	if r.MaxConcurrency > 0 {
-		maxConcurrency = r.MaxConcurrency
+	if c.MaxConcurrency > 0 {
+		maxConcurrency = c.MaxConcurrency
 	}
 	longTermThresholdDays := 2 // TODO
-	if r.LongTermThresholdDays > 0 {
-		longTermThresholdDays = r.LongTermThresholdDays
+	if c.LongTermThresholdDays > 0 {
+		longTermThresholdDays = c.LongTermThresholdDays
 	}
 
-	return &RestructureTablesFromDaily{
-		DB:                    r.DB,
-		DailyTable:            r.DailyTable,
-		MovingAvgTable:        r.MovingAvgTable,
-		TrendTable:            r.TrendTable,
-		Codes:                 r.Codes,
-		RestructureMovingavg:  r.RestructureMovingavg,
-		RestructureTrend:      r.RestructureTrend,
+	return &CalcMovingTrend{
+		DB:                    c.DB,
+		DailyTable:            c.DailyTable,
+		MovingAvgTable:        c.MovingAvgTable,
+		TrendTable:            c.TrendTable,
+		Codes:                 c.Codes,
 		FromDate:              fromDate,
 		ToDate:                toDate,
 		MaxConcurrency:        maxConcurrency,
 		LongTermThresholdDays: longTermThresholdDays,
+		// RestructureMovingavg:  c.RestructureMovingavg,
+		// RestructureTrend:      c.RestructureTrend,
 	}, nil
 }
 
-// Restructure is method to restructure tables.
-func (r *RestructureTablesFromDaily) Restructure() error {
+// Exec is method.
+func (c CalcMovingTrend) Exec() error {
 	// 複数Codeごとに処理する
 	// 同時に処理する最大件数はMaxConcurrencyで与えられる
 
+	log.Printf("calcForEachCode from-to: %s-%s", c.FromDate, c.ToDate)
+
 	var targetCodes []string
-	for _, code := range r.Codes {
+	for _, code := range c.Codes {
 		targetCodes = append(targetCodes, code)
 		// MaxConcurrencyに達したら一旦処理
-		if len(targetCodes) == r.MaxConcurrency {
-			if err := r.restructureForEachCodes(targetCodes); err != nil {
-				return fmt.Errorf("failed to restructureForEachCodes: %v", err)
+		if len(targetCodes) == c.MaxConcurrency {
+			if err := c.calcForEachCode(targetCodes); err != nil {
+				return fmt.Errorf("failed to calcForEachCode: %v", err)
 			}
 			targetCodes = nil // 初期化
 		}
 	}
 	// MaxConcurrencyに達しなかった残りを処理
 	if len(targetCodes) > 0 {
-		if err := r.restructureForEachCodes(targetCodes); err != nil {
-			return fmt.Errorf("failed to restructureForEachCodes: %v", err)
+		if err := c.calcForEachCode(targetCodes); err != nil {
+			return fmt.Errorf("failed to calcForEachCode: %v", err)
 		}
 	}
 	return nil
 }
 
-func (r *RestructureTablesFromDaily) restructureForEachCodes(targetCodes []string) error {
+func (c CalcMovingTrend) calcForEachCode(targetCodes []string) error {
 	start := time.Now()
 	defer func() {
 		// TODO： codeや期間をログに残す？
-		log.Printf("restructureForEachCodes duration: %v, target codes: %d, from-to: %s-%s", time.Since(start), len(targetCodes), r.FromDate, r.ToDate)
+		log.Printf("calcForEachCode duration: %v, target codes num: %d", time.Since(start), len(targetCodes))
 	}()
 
-	codeDateCloses, err := r.fetchCodesDateCloses(targetCodes)
+	codeDateCloses, err := c.fetchCodesDateCloses(targetCodes)
 	if err != nil {
 		return fmt.Errorf("failed to fetchCodesDateCloses: %v", err)
 	}
 	cdms := calculateCodeDateMovingAvgs(codeDateCloses)
-	cdts := calculateCodeDateTrend(codeDateCloses, cdms, r.LongTermThresholdDays)
+	cdts := calculateCodeDateTrend(codeDateCloses, cdms, c.LongTermThresholdDays)
 
-	if err := r.writeMovingAndTrend(codeDateCloses, cdms, cdts); err != nil {
+	if err := c.writeMovingAndTrend(codeDateCloses, cdms, cdts); err != nil {
 		return fmt.Errorf("failed to writeMovingAndTrend: %v", err)
 	}
+	log.Printf("write moving and trend successfully, code: %v", targetCodes)
 	return nil
 }
 
-// TODO: movingavg.goのrecentClosesと機能が重複している
-func (r *RestructureTablesFromDaily) fetchCodesDateCloses(targetCodes []string) (map[string][]DateClose, error) {
-	codes := joinCodeForWhereInStatement(targetCodes)
-
+func (c CalcMovingTrend) fetchCodesDateCloses(targetCodes []string) (map[string][]DateClose, error) {
 	fromDate := ""
-	if r.FromDate != "" {
-		fromDate = fmt.Sprintf("AND date >= '%s'", r.FromDate)
+	if c.FromDate != "" {
+		fromDate = fmt.Sprintf("AND date >= '%s'", c.FromDate)
 	}
 	toDate := ""
-	if r.ToDate != "" {
-		toDate = fmt.Sprintf("AND date <= '%s'", r.ToDate)
+	if c.ToDate != "" {
+		toDate = fmt.Sprintf("AND date <= '%s'", c.ToDate)
 	}
-	q := fmt.Sprintf("SELECT code, date, close FROM %s WHERE code in (%s) %s %s ORDER BY code, date DESC;", r.DailyTable, codes, fromDate, toDate)
-	res, err := r.DB.SelectDB(q)
-	if err != nil {
-		return nil, fmt.Errorf("failed to selectTable %v", err)
-	}
-	if len(res) == 0 {
-		return nil, fmt.Errorf("no selected data. query: '%s'", q)
-	}
-
-	codeDateCloses := make(map[string][]DateClose, len(r.Codes))
-	var dcs []DateClose
-
-	// 以下、複数のcodeとdate が混じったデータを処理するので、
-	// currentCodeに現在扱っているcodeを格納して（以下の例だと最初は1001）、
-	// あるループでcodeがcurrentCodeと異なったら（以下の例だと1002が出現したら）、
-	// currentCodeを1002に入れ替えるという方法で区別して扱う
-	// 例
-	// 1001, 2020/1/3...
-	// 1001, 2020/1/2...
-	// 1001, 2020/1/1...
-	// 1002, 2020/1/3...
-	// 1002, 2020/1/2...
-	// 1002, 2020/1/1...
-	currentCode := ""
-	prevClose := float64(1) // default 0だとgrowthRateの計算で0除算になってしまうので1とした
-	for i, r := range res {
-		code := r[0]
-		if i == 0 {
-			currentCode = code
-		} else if currentCode != code {
-			codeDateCloses[currentCode] = dcs
-			dcs = nil
-			currentCode = code
-			prevClose = float64(1) // codeが変わったので1に戻す
-		}
-		date := r[1]
-
-		close := r[2]
-		var floatClose float64
-		if close == "--" { // スクレイピングした時に`--`で格納されていることがあったので、この場合は一つ前の値にする
-			floatClose = prevClose
-			log.Printf("Warning. close is '--'. Use previous close: %v alternatively. code: %s, date: %s", prevClose, code, date)
-		} else {
-			// float64型数値に変換
-			// closeには小数点が入っていることがあるのでfloatで扱う
-			var err error
-			floatClose, err = strconv.ParseFloat(close, 64)
-			if err != nil {
-				return nil, fmt.Errorf("failed to ParseFloat. %v. code: %s, date: %s", err, code, date)
-			}
-		}
-		prevClose = floatClose
-
-		dcs = append(dcs, DateClose{Date: date, Close: floatClose})
-	}
-	codeDateCloses[currentCode] = dcs // 最後のcode分を格納
-
-	if len(codeDateCloses) != len(targetCodes) {
-		return nil, fmt.Errorf("unmatch codes. result codes: %d, targetCodes: %d", len(codeDateCloses), len(targetCodes))
-	}
-
-	return codeDateCloses, nil
+	return fetchCodesDateCloses(c.DB, c.DailyTable, targetCodes, fromDate, toDate, "")
 }
 
-func joinCodeForWhereInStatement(codes []string) string {
-	cs := make([]string, len(codes))
-	for i, code := range codes {
-		cs[i] = fmt.Sprintf("'%s'", code)
-	}
-	return strings.Join(cs, ",")
-}
-
-// TODO: movingavg.goと機能が重複している?
-func (r *RestructureTablesFromDaily) writeMovingAndTrend(cdcs map[string][]DateClose, cdms map[string][]DateMovingAvgs, cdts map[string][]DateTrendList) error {
+func (c CalcMovingTrend) writeMovingAndTrend(cdcs map[string][]DateClose, cdms map[string][]DateMovingAvgs, cdts map[string][]DateTrendList) error {
 	movingavgData := CodeDateMovingAvgs(cdms).Slices()
-	if err := r.DB.InsertOrUpdateDB(r.MovingAvgTable, movingavgData); err != nil {
+	if err := c.DB.InsertOrUpdateDB(c.MovingAvgTable, movingavgData); err != nil {
 		return fmt.Errorf("failed to insert movingavg: %v", err)
 	}
 
 	trendData := CodeDateTrendLists(cdts).makeTrendDataForDB()
-	if err := r.DB.InsertOrUpdateDB(r.TrendTable, trendData); err != nil {
+	if err := c.DB.InsertOrUpdateDB(c.TrendTable, trendData); err != nil {
 		return fmt.Errorf("failed to insert trend: %v", err)
 	}
 	return nil
@@ -269,6 +197,9 @@ func calculateCodeDateMovingAvgs(codeDateCloses map[string][]DateClose) map[stri
 func calculateMovingAvg(dateCloses []DateClose) []DateMovingAvgs {
 	dcs := DateCloses(dateCloses)
 
+	// 取得対象の移動平均
+	targetMovingAvgs := []int{3, 5, 7, 10, 20, 60, 100}
+
 	// (日付:移動平均)のMapを3, 5, 7,...ごとに格納したMap
 	moving := make(map[int]map[string]float64)
 	for _, days := range targetMovingAvgs {
@@ -277,11 +208,11 @@ func calculateMovingAvg(dateCloses []DateClose) []DateMovingAvgs {
 		moving[days] = dcs.calcMovingAvg(days)
 	}
 	var dateMovingAvgs []DateMovingAvgs
-	for _, r := range dcs {
-		d := r.Date // 日付
+	for _, c := range dcs {
+		d := c.Date // 日付
 		dm := DateMovingAvgs{
-			date: d,
-			movingAvgs: MovingAvgs{
+			Date: d,
+			MovingAvgs: MovingAvgs{
 				M3:   moving[3][d],
 				M5:   moving[5][d],
 				M7:   moving[7][d],
@@ -312,9 +243,9 @@ func calculateTrend(dateCloses []DateClose, dateMovingAvgs []DateMovingAvgs, lon
 
 	for i := len(dateMovingAvgs) - 1; i >= 0; i-- { // 日付の古い順
 		dm := dateMovingAvgs[i]
-		date := dm.date
+		date := dm.Date
 
-		ms := dm.movingAvgs
+		ms := dm.MovingAvgs
 		tm := TrendMovingAvgs{
 			M5:   ms.M5,
 			M20:  ms.M20,
@@ -325,11 +256,9 @@ func calculateTrend(dateCloses []DateClose, dateMovingAvgs []DateMovingAvgs, lon
 		closes := extractCloses(date, dateCloses)
 
 		reversedPastTrends := makeReversePastTrends(pastTrends, longTermThresholdDays)
-		latestTrendList := calculateTrendList(tm, reversedPastTrends, closes, longTermThresholdDays)
+		latestTrendList := calculateTrendList(closes, tm, reversedPastTrends, longTermThresholdDays)
 
 		dateTrendLists = append(dateTrendLists, DateTrendList{date: date, trendList: latestTrendList})
-
-		// trendLists = append(trendLists, latestTrendList)
 
 		pastTrends = append(pastTrends, latestTrendList.trend)
 	}

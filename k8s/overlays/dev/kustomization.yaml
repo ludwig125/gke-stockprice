@@ -23,7 +23,7 @@ configMapGenerator:
   - DB_NAME=stockprice_dev
   - DUMP_TARGET_TABLES=daily,movingavg
   files:
-  - GROWTHTREND_TARGETDATE=growthtrend_targetdate.txt
+  - CALC_TREND_TARGETDATE=growthtrend_targetdate.txt
   - DAILY_PRICE_URL=daily_price_url.txt
 
 - name: sql-proxy-config
