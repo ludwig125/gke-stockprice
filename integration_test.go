@@ -238,7 +238,7 @@ func setFiles(connectionName string) error {
 		return fmt.Errorf("failed to nikkeiMockClusterIP: %v", err)
 	}
 
-	// nikkei mockの直近のテストデータをtargetDateとしてGROWTHTREND_TARGETDATEに設定する
+	// nikkei mockの直近のテストデータをtargetDateとしてCALC_TREND_TARGETDATEに設定する
 	// テストデータには'5/16'のような形式でしか日付が入っていないので、
 	// いつの年に実行されても正しく起動するようにformatDate関数を使う
 	targetDate, err := formatDate(time.Now(), "5/16") // testdataの最新の日付

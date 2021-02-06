@@ -144,16 +144,11 @@ func execProcess(ctx context.Context) error {
 			fetchInterval:      time.Duration(strToInt(useEnvOrDefault("SCRAPE_INTERVAL", "1000"))) * time.Millisecond, // スクレイピングの間隔(millisec)
 			fetchTimeout:       time.Duration(strToInt(useEnvOrDefault("SCRAPE_TIMEOUT", "1000"))) * time.Millisecond,  // スクレイピングのtimeout(millisec)
 		},
-		calculateMovingAvg: CalculateMovingAvg{
-			db:              db,
-			calcConcurrency: strToInt(useEnvOrDefault("CALC_MOVINGAVG_CONCURRENCY", "3")), // 最大同時並行数
-		},
-		calculateGrowthTrend: CalculateGrowthTrend{
-			db:              db,
-			sheet:           trendSheet,
-			calcConcurrency: strToInt(useEnvOrDefault("CALC_GROWTHTREND_CONCURRENCY", "3")), // 最大同時並行数
-			// targetDate:            useEnvOrDefault("GROWTHTREND_TARGETDATE", time.Now().AddDate(0, 0, -1).Format("2006/01/02")), // defaultは起動日の前日
-			targetDate:            growthTrendTargetDate(),
+		calculateDailyMovingAvgTrend: CalculateDailyMovingAvgTrend{
+			db:                    db,
+			sheet:                 trendSheet,
+			calcConcurrency:       strToInt(useEnvOrDefault("CALC_MOVING_TREND_CONCURRENCY", "3")), // 最大同時並行数
+			targetDate:            calculateTrendTargetDate(),
 			longTermThresholdDays: 2, // TODO: どれくらいにすればいいか考える
 		},
 	}
@@ -213,8 +208,8 @@ func strToSlice(s string) []string {
 	return ss
 }
 
-func growthTrendTargetDate() string {
-	date := os.Getenv("GROWTHTREND_TARGETDATE")
+func calculateTrendTargetDate() string {
+	date := os.Getenv("CALC_TREND_TARGETDATE")
 	if date == "previous_date" {
 		return time.Now().AddDate(0, 0, -1).Format("2006/01/02") // defaultは起動日の前日
 	}
@@ -323,25 +318,25 @@ func restructureTablesFromDaily(db database.DB, codes []string, statusSheet shee
 		log.Println("restructureTablesFromDaily", now(), now().Sub(start))
 	}()
 
-	restructureConfig := RestructureTablesFromDailyConfig{
-		DB:                   db,
-		DailyTable:           useEnvOrDefault("RESTRUCTURE_FROM_DAILY_TABLE", "daily"),
-		MovingAvgTable:       mustGetenv("RESTRUCTURE_TO_MOVINGAVG_TABLE"),
-		TrendTable:           mustGetenv("RESTRUCTURE_TO_TREND_TABLE"),
-		Codes:                codes,
-		RestructureMovingavg: true,
-		RestructureTrend:     true,
-		FromDate:             useEnvOrDefault("RESTRUCTURE_FROM_DATE", time.Now().AddDate(0, 0, -10).Format("2006/01/02")),
-		ToDate:               useEnvOrDefault("RESTRUCTURE_TO_DATE", time.Now().Format("2006/01/02")),
-		MaxConcurrency:       strToInt(useEnvOrDefault("RESTRUCTURE_MAX_CONCURRENCY", "10")),
+	config := CalcMovingTrendConfig{
+		DB:             db,
+		DailyTable:     useEnvOrDefault("RESTRUCTURE_FROM_DAILY_TABLE", "daily"),
+		MovingAvgTable: mustGetenv("RESTRUCTURE_TO_MOVINGAVG_TABLE"),
+		TrendTable:     mustGetenv("RESTRUCTURE_TO_TREND_TABLE"),
+		Codes:          codes,
+		FromDate:       useEnvOrDefault("RESTRUCTURE_FROM_DATE", time.Now().AddDate(0, 0, -10).Format("2006/01/02")),
+		ToDate:         useEnvOrDefault("RESTRUCTURE_TO_DATE", time.Now().Format("2006/01/02")),
+		MaxConcurrency: strToInt(useEnvOrDefault("RESTRUCTURE_MAX_CONCURRENCY", "10")),
+		// RestructureMovingavg: true,
+		// RestructureTrend:     true,
 		// TODO: LongTermThresholdDaysも環境変数から指定する
 	}
-	restructure, err := NewRestructureTablesFromDaily(restructureConfig)
+	calc, err := NewCalcMovingTrend(config)
 	if err != nil {
-		return fmt.Errorf("failed to NewRestructureTablesFromDaily: %w", err)
+		return fmt.Errorf("failed to NewCalcMovingTrend: %w", err)
 	}
-	if err := restructure.Restructure(); err != nil {
-		return fmt.Errorf("failed to Restructure: %w", err)
+	if err := calc.Exec(); err != nil {
+		return fmt.Errorf("failed to Exec: %w", err)
 	}
 	return nil
 }
