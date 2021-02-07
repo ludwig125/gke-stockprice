@@ -144,13 +144,7 @@ jobs:
             export INTEGRATION_TEST_SHEETID=$INTEGRATION_TEST_SHEETID
             export DRIVE_FOLDER_NAME=gke-stockprice-dump-test
             export DRIVE_PERMISSION_GMAIL=${GMAIL}
-            go test -v googledrive/* -tags integration -timeout 30m
-          # command: |
-          #   export CREDENTIAL_FILEPATH=gke-stockprice-serviceaccount.json
-          #   export INTEGRATION_TEST_SHEETID=$INTEGRATION_TEST_SHEETID
-          #   export DRIVE_FOLDER_NAME=gke-stockprice-dump-test
-          #   export DRIVE_PERMISSION_GMAIL=${GMAIL}
-          #   go test -v ./... -tags integration -timeout 30m
+            go test -v ./... -tags integration -timeout 30m
           # TODO： integration_test後にclusterが無くなっているか確認するステップを入れる
 
   create_gke_cluster_and_deploy_by_golang:
