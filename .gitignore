@@ -8,7 +8,7 @@ db_username.txt
 db_password.txt
 sheetid.txt
 db_connection_name.txt
-growthtrend_targetdate.txt
+calc_moving_trend_targetdate.txt
 dev_sheetid.txt
 google-cloud-sdk
 cloud_sql_proxy

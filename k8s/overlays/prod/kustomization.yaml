@@ -39,12 +39,14 @@ configMapGenerator:
   - RESTRUCTURE_MAX_CONCURRENCY=20
 
   files:
+  # This should be set previously, by `echo -n "value" > file`
+  # Use `-n` to prevent a newline character
   - DAILY_PRICE_URL=daily_price_url.txt
 
 - name: sql-proxy-config
   behavior: create
   literals:
-  - db_connection_name=gke-stockprice:us-central1:gke-stockprice-cloudsql-prod
+  - db_connection_name=gke-stockprice:us-central1:gke-stockprice-cloudsql-prod # This is prod cloud sql connection name.
 
 secretGenerator:
 - name: stockprice-secret
