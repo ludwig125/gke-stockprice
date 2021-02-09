@@ -249,7 +249,7 @@ func setFiles(connectionName string) error {
 	fs := []file.File{
 		{Name: "db_connection_name.txt", Content: connectionName},
 		{Name: "daily_price_url.txt", Content: "http://" + clusterIP},
-		{Name: "growthtrend_targetdate.txt", Content: targetDate},
+		{Name: "calc_moving_trend_targetdate.txt", Content: targetDate},
 	}
 
 	if err := file.CreateFiles("k8s/overlays/dev", fs...); err != nil {

@@ -9,7 +9,9 @@ spec:
   # https://en.wikipedia.org/wiki/Cron
   # https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/
   # https://kubernetes.io/ja/docs/concepts/workloads/controllers/cron-jobs/
+  # Run every 1 minute.
   schedule: "*/1 * * * *"
+  # Forbid to start cron, if previous cron job is running.
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
@@ -81,6 +83,8 @@ spec:
             secret:
               secretName: kube-gke-stockprice-serviceaccount
               items:
+              # This key name is the same as file name.
               - key: gke-stockprice-serviceaccount.json
                 path: gke-stockprice-serviceaccount.json
+          # Do not restart container when cron failed.
           restartPolicy: Never
