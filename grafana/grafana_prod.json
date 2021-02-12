@@ -16,7 +16,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 5,
-  "iteration": 1610609188674,
+  "iteration": 1613164147189,
   "links": [],
   "panels": [
     {
@@ -40,7 +40,7 @@
         "y": 0
       },
       "hiddenSeries": false,
-      "id": 2,
+      "id": 5,
       "legend": {
         "alignAsTable": true,
         "avg": false,
@@ -58,12 +58,13 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.3.4",
+      "pluginVersion": "7.4.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [
         {
+          "$$hashKey": "object:487",
           "alias": "/trend$/",
           "color": "#F2CC0C",
           "linewidth": 2,
@@ -71,6 +72,7 @@
           "yaxis": 2
         },
         {
+          "$$hashKey": "object:410",
           "alias": "/continuation$/",
           "bars": true,
           "color": "rgba(222, 182, 242, 0.28)",
@@ -78,12 +80,14 @@
           "yaxis": 2
         },
         {
+          "$$hashKey": "object:475",
           "alias": "/moving*/",
           "fillGradient": 1,
           "lines": true,
           "linewidth": 1
         },
         {
+          "$$hashKey": "object:412",
           "alias": "/crossMoving5$/",
           "bars": true,
           "color": "#FF7383",
@@ -91,6 +95,7 @@
           "yaxis": 2
         },
         {
+          "$$hashKey": "object:440",
           "alias": "/trendTurn$/",
           "color": "rgb(255, 255, 255)",
           "lines": false,
@@ -163,88 +168,8 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  UNIX_TIMESTAMP(`date`) AS \"time\",\r\n  CONCAT(code,\"_trend\")  AS metric,\r\n  CAST(trend AS UNSIGNED) AS \"trend\"\r\nFROM trend\r\nWHERE\r\n  $__timeFilter(`date`)\r\n  AND code in ($code)\r\nORDER BY time",
+          "rawSql": "SELECT\r\n  UNIX_TIMESTAMP(`date`) AS \"time\",\r\n  code AS metric,\r\n  CAST(trend AS UNSIGNED) AS \"trend\",\r\n  CAST(continuationDays AS UNSIGNED) AS \"continuation\",\r\n  (CAST(crossMoving5 AS SIGNED) -2)*5 AS \"crossMoving5\",\r\n  CASE\r\n    WHEN trendTurn = '2' then NULL\r\n    ELSE CAST(trendTurn AS UNSIGNED)\r\n  END AS trendTurn\r\nFROM trend\r\nWHERE\r\n  $__timeFilter(`date`)\r\n  AND code in ($code)\r\nORDER BY time",
           "refId": "C",
-          "select": [
-            [
-              {
-                "params": [
-                  "value"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "timeColumn": "time",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        },
-        {
-          "format": "time_series",
-          "group": [],
-          "hide": false,
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\r\n  UNIX_TIMESTAMP(`date`) AS \"time\",\r\n  CONCAT(code,\"_continuation\")  AS metric,\r\n  CAST(continuationDays AS UNSIGNED) AS \"continuationDays\"\r\nFROM trend\r\nWHERE\r\n  $__timeFilter(`date`)\r\n  AND code in ($code)\r\nORDER BY time",
-          "refId": "D",
-          "select": [
-            [
-              {
-                "params": [
-                  "value"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "timeColumn": "time",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        },
-        {
-          "format": "time_series",
-          "group": [],
-          "hide": false,
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\r\n  UNIX_TIMESTAMP(`date`) AS \"time\",\r\n  CONCAT(code,\"_crossMoving5\")  AS metric,\r\n  (CAST(crossMoving5 AS SIGNED) -2)*5 AS \"crossMoving5\"\r\nFROM trend\r\nWHERE\r\n  $__timeFilter(`date`)\r\n  AND code in ($code)\r\nORDER BY time",
-          "refId": "E",
-          "select": [
-            [
-              {
-                "params": [
-                  "value"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "timeColumn": "time",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        },
-        {
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\r\n  UNIX_TIMESTAMP(`date`) AS \"time\",\r\n  CONCAT(code,\"_trendTurn\")  AS metric,\r\n  CAST(trendTurn AS UNSIGNED)  AS \"trendTurn\"\r\nFROM trend\r\nWHERE\r\n  $__timeFilter(`date`)\r\n  AND trendTurn != 2\r\n  AND code in ($code)\r\nORDER BY time",
-          "refId": "F",
           "select": [
             [
               {
@@ -267,6 +192,7 @@
       ],
       "thresholds": [
         {
+          "$$hashKey": "object:486",
           "colorMode": "custom",
           "fill": false,
           "fillColor": "rgba(51, 162, 229, 0.2)",
@@ -296,6 +222,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:158",
           "decimals": 1,
           "format": "none",
           "label": "yen",
@@ -305,11 +232,12 @@
           "show": true
         },
         {
+          "$$hashKey": "object:159",
           "format": "string",
           "label": "trend",
           "logBase": 1,
           "max": "50",
-          "min": "-2",
+          "min": "-3",
           "show": true
         }
       ],
@@ -357,12 +285,13 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.3.4",
+      "pluginVersion": "7.4.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [
         {
+          "$$hashKey": "object:487",
           "alias": "/trend$/",
           "color": "#F2CC0C",
           "linewidth": 2,
@@ -370,18 +299,21 @@
           "yaxis": 2
         },
         {
+          "$$hashKey": "object:410",
           "alias": "/continuation$/",
           "bars": true,
           "lines": false,
           "yaxis": 2
         },
         {
+          "$$hashKey": "object:475",
           "alias": "/moving*/",
           "fillGradient": 1,
           "lines": true,
           "linewidth": 1
         },
         {
+          "$$hashKey": "object:681",
           "alias": "/trendTurn$/",
           "color": "rgb(245, 244, 238)",
           "lines": false,
@@ -390,6 +322,7 @@
           "yaxis": 2
         },
         {
+          "$$hashKey": "object:1249",
           "alias": "/crossMoving5$/",
           "bars": true,
           "color": "#FFA6B0",
@@ -583,6 +516,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:158",
           "decimals": 1,
           "format": "none",
           "label": "yen",
@@ -592,11 +526,12 @@
           "show": true
         },
         {
+          "$$hashKey": "object:159",
           "format": "string",
           "label": "trend",
           "logBase": 1,
           "max": "50",
-          "min": "-2",
+          "min": "-3",
           "show": true
         }
       ],
@@ -644,12 +579,13 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.3.4",
+      "pluginVersion": "7.4.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [
         {
+          "$$hashKey": "object:487",
           "alias": "/trend$/",
           "color": "#F2CC0C",
           "linewidth": 2,
@@ -657,6 +593,7 @@
           "yaxis": 2
         },
         {
+          "$$hashKey": "object:410",
           "alias": "/continuation$/",
           "bars": true,
           "color": "rgba(222, 182, 242, 0.28)",
@@ -664,12 +601,14 @@
           "yaxis": 2
         },
         {
+          "$$hashKey": "object:475",
           "alias": "/moving*/",
           "fillGradient": 1,
           "lines": true,
           "linewidth": 1
         },
         {
+          "$$hashKey": "object:412",
           "alias": "/crossMoving5$/",
           "bars": true,
           "color": "#FF7383",
@@ -737,6 +676,7 @@
       ],
       "thresholds": [
         {
+          "$$hashKey": "object:486",
           "colorMode": "custom",
           "fill": false,
           "fillColor": "rgba(51, 162, 229, 0.2)",
@@ -766,6 +706,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:158",
           "decimals": 1,
           "format": "none",
           "label": "yen",
@@ -775,6 +716,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:159",
           "format": "string",
           "label": "trend",
           "logBase": 1,
@@ -790,7 +732,7 @@
     }
   ],
   "refresh": false,
-  "schemaVersion": 26,
+  "schemaVersion": 27,
   "style": "dark",
   "tags": [],
   "templating": {
@@ -799,11 +741,12 @@
         "allValue": null,
         "current": {
           "selected": false,
-          "text": "7545",
-          "value": "7545"
+          "text": "8068",
+          "value": "8068"
         },
         "datasource": "MySQL-cloudsql",
         "definition": "SELECT DISTINCT code FROM daily",
+        "description": null,
         "error": null,
         "hide": 0,
         "includeAll": false,
@@ -8372,7 +8315,7 @@
             "value": "7537"
           },
           {
-            "selected": true,
+            "selected": false,
             "text": "7545",
             "value": "7545"
           },
@@ -9247,7 +9190,7 @@
             "value": "8065"
           },
           {
-            "selected": false,
+            "selected": true,
             "text": "8068",
             "value": "8068"
           },
@@ -11778,5 +11721,5 @@
   "timezone": "",
   "title": "stockprice_prod",
   "uid": "4_3OEf-Gz",
-  "version": 14
+  "version": 17
 }

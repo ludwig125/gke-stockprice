@@ -192,7 +192,9 @@ func TestScrape(t *testing.T) {
 
 			sp := DailyStockPrice{
 				dailyStockpriceURL: ts.URL,
-				fetchTimeout:       10 * time.Millisecond,
+				// 10msにしたら、以下のようにTimeoutしたので長めにする
+				// context deadline exceeded. timeout setting: 10ms
+				fetchTimeout: 1000 * time.Millisecond,
 			}
 			currentTime := time.Date(2019, 12, 1, 0, 0, 0, 0, time.Local)
 			prices, err := sp.scrape(ctx, tc.code, currentTime)
