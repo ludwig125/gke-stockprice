@@ -5,13 +5,6 @@ import (
 	"time"
 )
 
-func TestSlack(t *testing.T) {
-	// token := mustGetenv("SLACK_TOKEN")
-	// channel := mustGetenv("SLACK_CHANNEL")
-	// sl := NewSlackClient(token, channel)
-	// sl.SendMessage("slack-test2", "test-message", ":sunny:")
-}
-
 type SlackClientMock struct{}
 
 func (s SlackClientMock) SendMessage(service, msg, emoji string) error {
