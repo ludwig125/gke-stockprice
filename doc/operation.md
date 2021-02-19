@@ -609,3 +609,8 @@ saveStockPrice	1610650313	2021/01/15 3:51:53	36m26.589424776s
 saveMovingAvgs	1610650603	2021/01/15 3:56:43	4m38.80397984s
 calculateGrowthTrend	1610651343	2021/01/15 4:09:03	12m19.514307946s
 ```
+
+
+# grafana
+
+http://localhost:3000/d/4_3OEf-Gz/stockprice_prod?viewPanel=3&orgId=1&from=1539699233000&to=1560130731000&var-code=3666

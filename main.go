@@ -147,7 +147,7 @@ func execProcess(ctx context.Context) error {
 		calculateDailyMovingAvgTrend: CalculateDailyMovingAvgTrend{
 			db:                    db,
 			sheet:                 trendSheet,
-			calcConcurrency:       strToInt(useEnvOrDefault("CALC_MOVING_TREND_CONCURRENCY", "3")), // 最大同時並行数
+			calcConcurrency:       strToInt(useEnvOrDefault("CALC_MOVING_TREND_CONCURRENCY", "3")), // 最大同時並列処理数
 			targetDate:            calculateTrendTargetDate(),
 			longTermThresholdDays: 2, // TODO: どれくらいにすればいいか考える
 		},

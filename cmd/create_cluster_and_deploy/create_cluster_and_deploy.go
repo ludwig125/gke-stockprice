@@ -81,17 +81,6 @@ func checkCloudSQLInstance() error {
 	return nil
 }
 
-// func kubectlLogs(ctx context.Context, dSrv *drive.Service) {
-// 	folderName := mustGetenv("DRIVE_FOLDER_NAME")
-// 	permissionTargetGmail := mustGetenv("DRIVE_PERMISSION_GMAIL")
-// 	fileName := "kubectl_logs"
-// 	dumpTime := time.Now()
-// 	// kubectl logsの結果をupload
-// 	if err := uploadKubectlLog(ctx, dSrv, folderName, permissionTargetGmail, fileName, dumpTime); err != nil {
-// 		log.Printf("failed to uploadKubectlLog: %v", err)
-// 	}
-// }
-
 func createCluster(cluster *gke.Cluster) error {
 	start := time.Now()
 	if err := cluster.CreateClusterIfNotExist(); err != nil {
